@@ -7,27 +7,31 @@
 #include "UObject/Interface.h"
 #include "Interactable.generated.h"
 
-// This class does not need to be modified.
-UINTERFACE()
-class UInteractable : public UInterface
+class APawn;
+
+UINTERFACE(BlueprintType)
+class RPGINVENTORY_API UInteractable : public UInterface
 {
 	GENERATED_BODY()
 };
 
 /**
- * 
+ * Runtime interaction interface with Blueprint support
  */
 class RPGINVENTORY_API IInteractable
 {
 	GENERATED_BODY()
 
-	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	// Display data used by UI prompt
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Interaction")
+	FInteractDisplayData GetDisplayData() const;
 
-	virtual FInteractDisplayData GetDisplayData() const = 0;
-	// Darf man gerade interagieren? (z.B. gesperrt, zu weit weg, etc.)
-	virtual bool CanInteract(AActor* Instigator) const { return true; }
+	// Is interaction currently allowed?
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Interaction")
+	bool CanInteract(APawn* Instigator) const;
 
-	// Die eigentliche Interaktion (Server-seitig ausführen!)
-	virtual void Interact(AActor* Instigator) = 0;
+	// Perform the interaction (should be executed on the server)
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Interaction")
+	void Interact(APawn* Instigator);
 };

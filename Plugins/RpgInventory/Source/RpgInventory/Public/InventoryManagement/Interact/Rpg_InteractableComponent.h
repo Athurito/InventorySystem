@@ -7,6 +7,7 @@
 #include "Interface/Interactable.h"
 #include "Rpg_InteractableComponent.generated.h"
 
+class APawn;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API URpg_InteractableComponent : public UActorComponent, public IInteractable
@@ -14,6 +15,8 @@ class RPGINVENTORY_API URpg_InteractableComponent : public UActorComponent, publ
 	GENERATED_BODY()
 
 public:
+	URpg_InteractableComponent();
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	bool bEnabled = true;
 
@@ -27,17 +30,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	float MaxUseDistance = 250.f;
 	
-	virtual FInteractDisplayData GetDisplayData() const override;
-	
-	virtual bool CanInteract(AActor* Instigator) const override;
+	// IInteractable implementations (BlueprintNativeEvent)
+	virtual FInteractDisplayData GetDisplayData_Implementation() const override;
+	virtual bool CanInteract_Implementation(APawn* Instigator) const override;
+	virtual void Interact_Implementation(APawn* Instigator) override;
 
 	// Standard-Interact: überschreibbar in BP oder per Subclass
 	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category="Interaction")
-	void BP_OnInteract(AActor* Instigator);
-
-	virtual void Interact(AActor* Instigator) override
-	{
-		// Default: nur BP Event triggern
-		BP_OnInteract(Instigator);
-	}
+	void BP_OnInteract(APawn* Instigator);
 };
