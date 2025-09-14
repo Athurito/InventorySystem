@@ -2,14 +2,6 @@ Binaries
 DerivedDataCache
 Intermediate
 Saved
-Build
-Content
-Plugins/Developer/*
-
-.idea/
-*.user
-*.userosscache
-*.sln.docstates
 .vscode
 .vs
 *.VC.db
@@ -20,3 +12,11 @@ Plugins/Developer/*
 *.suo
 *.xcodeproj
 *.xcworkspace
+
+# Rider user-specific files – don’t share
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/**/workspace.xml
+.idea/**/projectSettingsUpdater.xml
+.idea/
+*.iml
