@@ -6,6 +6,8 @@
 #include "InventoryManagement/Interact/Rpg_InteractableComponent.h"
 #include "InventoryManagement/Interact/Interface/Interactable.h"
 #include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
+#include "EnhancedInputComponent.h"
+#include "InputAction.h"
 
 
 void URpg_InteractionComponent::BeginPlay()
@@ -15,17 +17,60 @@ void URpg_InteractionComponent::BeginPlay()
 
 	if (PromptWidgetClass)
 	{
-		if (APlayerController* PC = Cast<APlayerController>(Cast<APawn>(GetOwner()) ? Cast<APawn>(GetOwner())->GetController() : nullptr))
+		APlayerController* PC = nullptr;
+		if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		{
+			PC = Cast<APlayerController>(OwnerPawn->GetController());
+		}
+		else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		{
+			PC = OwnerPC;
+		}
+		if (PC)
 		{
 			PromptWidget = CreateWidget<UInteractPromptWidget>(PC, PromptWidgetClass);
 			if (PromptWidget) { PromptWidget->AddToViewport(PromptZOrder); PromptWidget->SetPromptVisible(false); }
 		}
 	}
+
+	// Try to auto-bind Enhanced Input action if configured
+	if (UInputAction* Action = InteractInputAction)
+	{
+		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		{
+			if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerPC->InputComponent))
+			{
+				EIC->BindAction(Action, ETriggerEvent::Triggered, this, &URpg_InteractionComponent::TryInteract);
+			}
+		}
+		else if (APawn* OwnerPawn2 = Cast<APawn>(GetOwner()))
+		{
+			if (APlayerController* PC2 = Cast<APlayerController>(OwnerPawn2->GetController()))
+			{
+				if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PC2->InputComponent))
+				{
+					EIC->BindAction(Action, ETriggerEvent::Triggered, this, &URpg_InteractionComponent::TryInteract);
+				}
+			}
+		}
+	}
 }
 
-void URpg_InteractionComponent::TickComponent(float, ELevelTick, FActorComponentTickFunction*)
+void URpg_InteractionComponent::TickComponent(float DeltaTime, ELevelTick, FActorComponentTickFunction*)
 {
-	UpdateTrace();
+	if (UpdateInterval <= 0.f)
+	{
+		UpdateTrace();
+	}
+	else
+	{
+		TimeSinceUpdate += DeltaTime;
+		if (TimeSinceUpdate >= UpdateInterval)
+		{
+			TimeSinceUpdate = 0.f;
+			UpdateTrace();
+		}
+	}
 }
 
 UObject* URpg_InteractionComponent::FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const
@@ -58,8 +103,17 @@ UObject* URpg_InteractionComponent::FindInteractableOn(AActor* Actor, UPrimitive
 void URpg_InteractionComponent::UpdateTrace()
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	APlayerController* PC = OwnerPawn ? Cast<APlayerController>(OwnerPawn->GetController()) : nullptr;
-	if (!OwnerPawn || !PC) return;
+	APlayerController* PC = nullptr;
+	if (OwnerPawn)
+	{
+		PC = Cast<APlayerController>(OwnerPawn->GetController());
+	}
+	else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+	{
+		PC = OwnerPC;
+		OwnerPawn = OwnerPC->GetPawn();
+	}
+	if (!PC) return;
 
 	FVector ViewLoc; FRotator ViewRot;
 	PC->GetPlayerViewPoint(ViewLoc, ViewRot);
@@ -68,7 +122,8 @@ void URpg_InteractionComponent::UpdateTrace()
 	const FVector End   = Start + ViewRot.Vector() * TraceDistance;
 
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(InteractionTrace), /*bTraceComplex*/false, OwnerPawn);
+	AActor* IgnoreActor = OwnerPawn ? static_cast<AActor*>(OwnerPawn) : Cast<AActor>(PC);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(InteractionTrace), /*bTraceComplex*/false, IgnoreActor);
 	GetWorld()->LineTraceSingleByChannel(Hit, Start, End, TraceChannel, Params);
 
 	if (bDebug) DrawDebugLine(GetWorld(), Start, Hit.bBlockingHit ? Hit.ImpactPoint : End, Hit.bBlockingHit ? FColor::Green : FColor::Red, false, 0.f, 0, 0.5f);
@@ -99,6 +154,9 @@ void URpg_InteractionComponent::OnTargetChanged(UObject* NewInteractable, AActor
 	CurrentInteractable = NewInteractable;
 	CurrentTargetActor = NewActor;
 
+	// Notify listeners (BP/C++)
+	OnInteractTargetChanged.Broadcast(CurrentTargetActor.Get());
+
 	if (CurrentInteractable.IsValid()) ShowPromptFor(CurrentInteractable.Get());
 	else                              HidePrompt();
 }
@@ -127,7 +185,14 @@ void URpg_InteractionComponent::HidePrompt()
 void URpg_InteractionComponent::TryInteract()
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn || !CurrentInteractable.IsValid()) return;
+	if (!OwnerPawn)
+	{
+		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		{
+			OwnerPawn = OwnerPC->GetPawn();
+		}
+	}
+	if (!CurrentInteractable.IsValid() || !OwnerPawn) return;
 
 	// Clientseitig sanity-check
 	if (!IInteractable::Execute_CanInteract(CurrentInteractable.Get(), OwnerPawn)) return;
@@ -139,10 +204,17 @@ void URpg_InteractionComponent::TryInteract()
 void URpg_InteractionComponent::Server_Interact_Implementation(AActor* TargetActor)
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn || !TargetActor) return;
+	if (!OwnerPawn)
+	{
+		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		{
+			OwnerPawn = OwnerPC->GetPawn();
+		}
+	}
+	if (!TargetActor) return;
 
 	UObject* InteractableObj = FindInteractableOn(TargetActor, nullptr);
-	if (!InteractableObj) return;
+	if (!InteractableObj || !OwnerPawn) return;
 
 	// Sicherheit: Reichweite/CanInteract erneut am Server prüfen
 	if (!IInteractable::Execute_CanInteract(InteractableObj, OwnerPawn)) return;

@@ -7,6 +7,7 @@
 #include "Rpg_InteractionComponent.generated.h"
 
 class UInteractPromptWidget;
+class UInputAction;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractTargetChanged, AActor*, NewTarget);
 
 
@@ -17,10 +18,20 @@ class RPGINVENTORY_API URpg_InteractionComponent : public UActorComponent
 
 
 public:
+	// Trace settings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") float TraceDistance = 500.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
+	// Trace throttling: 0 = every tick, >0 = seconds between traces
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") float UpdateInterval = 0.f;
+
+	// UI settings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") TSubclassOf<UInteractPromptWidget> PromptWidgetClass;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") int32 PromptZOrder = 10;
+
+	// Input (Enhanced Input optional)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input") UInputAction* InteractInputAction = nullptr;
+
+	// Debug
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Debug") bool bDebug = false;
 
 	// Input ruft das hier auf (Client)
@@ -33,6 +44,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	AActor* GetCurrentTargetActor() const { return CurrentTargetActor.Get(); }
 
+	// Notify when target changes
+	UPROPERTY(BlueprintAssignable, Category="Interaction")
+	FOnInteractTargetChanged OnInteractTargetChanged;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -41,6 +56,8 @@ private:
 	TWeakObjectPtr<AActor>  CurrentTargetActor;
 	TWeakObjectPtr<UObject> CurrentInteractable; // Actor ODER Component, die UInteractable implementiert
 	UPROPERTY() UInteractPromptWidget* PromptWidget = nullptr;
+
+	float TimeSinceUpdate = 0.f;
 
 	void UpdateTrace();
 	UObject* FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const;
