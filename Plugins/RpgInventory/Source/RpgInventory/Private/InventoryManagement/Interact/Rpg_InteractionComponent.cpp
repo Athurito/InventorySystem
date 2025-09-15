@@ -8,41 +8,71 @@
 #include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
-
+#include "GameFramework/PlayerController.h"
+#include "Blueprint/UserWidget.h"
 
 URpg_InteractionComponent::URpg_InteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
-	// SetComponentTickEnabled(true);
 	bAutoActivate = true;
+}
 
-	if (PromptWidgetClass)
+
+void URpg_InteractionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Resolve owner pawn and player controller
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	APlayerController* PC = nullptr;
+	if (OwnerPawn)
 	{
-		
-		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		PC = Cast<APlayerController>(OwnerPawn->GetController());
+	}
+	else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+	{
+		PC = OwnerPC;
+		OwnerPawn = OwnerPC->GetPawn();
+	}
+
+	// Create prompt widget on local player if a class is provided
+	if (PromptWidgetClass && PC)
+	{
+		PromptWidget = CreateWidget<UInteractPromptWidget>(PC, PromptWidgetClass);
+		if (PromptWidget)
 		{
-			PromptWidget = CreateWidget<UInteractPromptWidget>(OwnerPC, PromptWidgetClass);
-			if (PromptWidget)
-			{
-				PromptWidget->AddToViewport(PromptZOrder); PromptWidget->SetPromptVisible(false);
-			}
+			PromptWidget->AddToViewport(PromptZOrder);
+			PromptWidget->SetPromptVisible(false);
 		}
 	}
 
 	// Try to auto-bind Enhanced Input action if configured
-	if (UInputAction* Action = InteractInputAction)
+	if (InteractInputAction)
 	{
-		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		UEnhancedInputComponent* EIC = nullptr;
+		if (OwnerPawn && OwnerPawn->InputComponent)
 		{
-			if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerPC->InputComponent))
-			{
-				EIC->BindAction(Action, ETriggerEvent::Triggered, this, &URpg_InteractionComponent::TryInteract);
-			}
+			EIC = Cast<UEnhancedInputComponent>(OwnerPawn->InputComponent);
+		}
+		if (!EIC && PC && PC->InputComponent)
+		{
+			EIC = Cast<UEnhancedInputComponent>(PC->InputComponent);
+		}
+		if (EIC)
+		{
+			EIC->BindAction(InteractInputAction, ETriggerEvent::Started, this, &URpg_InteractionComponent::TryInteract);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("URpg_InteractionComponent: EnhancedInputComponent not available to bind Interact."));
 		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("URpg_InteractionComponent: InteractInputAction is null; assign it in the component settings."));
+	}
 }
-
 
 void URpg_InteractionComponent::TickComponent(float DeltaTime, ELevelTick, FActorComponentTickFunction*)
 {
