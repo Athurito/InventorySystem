@@ -18,6 +18,7 @@ class RPGINVENTORY_API URpg_InteractionComponent : public UActorComponent
 
 
 public:
+	URpg_InteractionComponent();
 	// Trace settings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") float TraceDistance = 500.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
@@ -25,14 +26,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") float UpdateInterval = 0.f;
 
 	// UI settings
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") TSubclassOf<UInteractPromptWidget> PromptWidgetClass;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") int32 PromptZOrder = 10;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") TSubclassOf<UInteractPromptWidget> PromptWidgetClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") int32 PromptZOrder = 10;
 
 	// Input (Enhanced Input optional)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input") UInputAction* InteractInputAction = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") UInputAction* InteractInputAction = nullptr;
 
 	// Debug
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Debug") bool bDebug = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") bool bDebug = false;
 
 	// Input ruft das hier auf (Client)
 	UFUNCTION(BlueprintCallable, Category="Interaction")
@@ -49,16 +50,14 @@ public:
 	FOnInteractTargetChanged OnInteractTargetChanged;
 
 protected:
-	virtual void BeginPlay() override;
+	
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	TWeakObjectPtr<AActor>  CurrentTargetActor;
 	TWeakObjectPtr<UObject> CurrentInteractable; // Actor ODER Component, die UInteractable implementiert
 	UPROPERTY() UInteractPromptWidget* PromptWidget = nullptr;
-
-	float TimeSinceUpdate = 0.f;
-
+	
 	void UpdateTrace();
 	UObject* FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const;
 	void OnTargetChanged(UObject* NewInteractable, AActor* NewActor);

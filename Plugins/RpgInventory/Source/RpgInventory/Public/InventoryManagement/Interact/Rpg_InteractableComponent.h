@@ -8,6 +8,7 @@
 #include "Rpg_InteractableComponent.generated.h"
 
 class APawn;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteraction, AActor*, NewTarget);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API URpg_InteractableComponent : public UActorComponent, public IInteractable
@@ -21,7 +22,7 @@ public:
 	bool bEnabled = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
-	UInteractableDataAsset* DataAsset = nullptr;
+	UInteractableDataAsset* InteractableData = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	FInteractDisplayData InlineDisplayData;
@@ -35,7 +36,8 @@ public:
 	virtual bool CanInteract_Implementation(APawn* Instigator) const override;
 	virtual void Interact_Implementation(APawn* Instigator) override;
 
-	// Standard-Interact: überschreibbar in BP oder per Subclass
-	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category="Interaction")
-	void BP_OnInteract(APawn* Instigator);
+
+private:
+	UPROPERTY(BlueprintAssignable, Category="Interaction")
+	FOnInteraction OnInteraction;
 };

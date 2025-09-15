@@ -10,26 +10,23 @@
 #include "InputAction.h"
 
 
-void URpg_InteractionComponent::BeginPlay()
+URpg_InteractionComponent::URpg_InteractionComponent()
 {
-	Super::BeginPlay();
 	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
+	// SetComponentTickEnabled(true);
+	bAutoActivate = true;
 
 	if (PromptWidgetClass)
 	{
-		APlayerController* PC = nullptr;
-		if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		
+		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
 		{
-			PC = Cast<APlayerController>(OwnerPawn->GetController());
-		}
-		else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
-		{
-			PC = OwnerPC;
-		}
-		if (PC)
-		{
-			PromptWidget = CreateWidget<UInteractPromptWidget>(PC, PromptWidgetClass);
-			if (PromptWidget) { PromptWidget->AddToViewport(PromptZOrder); PromptWidget->SetPromptVisible(false); }
+			PromptWidget = CreateWidget<UInteractPromptWidget>(OwnerPC, PromptWidgetClass);
+			if (PromptWidget)
+			{
+				PromptWidget->AddToViewport(PromptZOrder); PromptWidget->SetPromptVisible(false);
+			}
 		}
 	}
 
@@ -43,34 +40,13 @@ void URpg_InteractionComponent::BeginPlay()
 				EIC->BindAction(Action, ETriggerEvent::Triggered, this, &URpg_InteractionComponent::TryInteract);
 			}
 		}
-		else if (APawn* OwnerPawn2 = Cast<APawn>(GetOwner()))
-		{
-			if (APlayerController* PC2 = Cast<APlayerController>(OwnerPawn2->GetController()))
-			{
-				if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PC2->InputComponent))
-				{
-					EIC->BindAction(Action, ETriggerEvent::Triggered, this, &URpg_InteractionComponent::TryInteract);
-				}
-			}
-		}
 	}
 }
 
+
 void URpg_InteractionComponent::TickComponent(float DeltaTime, ELevelTick, FActorComponentTickFunction*)
 {
-	if (UpdateInterval <= 0.f)
-	{
-		UpdateTrace();
-	}
-	else
-	{
-		TimeSinceUpdate += DeltaTime;
-		if (TimeSinceUpdate >= UpdateInterval)
-		{
-			TimeSinceUpdate = 0.f;
-			UpdateTrace();
-		}
-	}
+	UpdateTrace();
 }
 
 UObject* URpg_InteractionComponent::FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const
@@ -157,8 +133,14 @@ void URpg_InteractionComponent::OnTargetChanged(UObject* NewInteractable, AActor
 	// Notify listeners (BP/C++)
 	OnInteractTargetChanged.Broadcast(CurrentTargetActor.Get());
 
-	if (CurrentInteractable.IsValid()) ShowPromptFor(CurrentInteractable.Get());
-	else                              HidePrompt();
+	if (CurrentInteractable.IsValid())
+	{
+		ShowPromptFor(CurrentInteractable.Get());
+	}
+	else
+	{
+		HidePrompt();
+	}
 }
 
 void URpg_InteractionComponent::ShowPromptFor(UObject* InteractableObj)

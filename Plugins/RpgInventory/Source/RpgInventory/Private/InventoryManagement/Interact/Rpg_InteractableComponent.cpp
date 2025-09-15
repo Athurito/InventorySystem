@@ -11,7 +11,7 @@ URpg_InteractableComponent::URpg_InteractableComponent()
 
 FInteractDisplayData URpg_InteractableComponent::GetDisplayData_Implementation() const
 {
-	return DataAsset ? DataAsset->Display : InlineDisplayData;
+	return InteractableData ? InteractableData->Display : InlineDisplayData;
 }
 
 bool URpg_InteractableComponent::CanInteract_Implementation(APawn* Instigator) const
@@ -25,5 +25,5 @@ bool URpg_InteractableComponent::CanInteract_Implementation(APawn* Instigator) c
 
 void URpg_InteractableComponent::Interact_Implementation(APawn* Instigator)
 {
-	BP_OnInteract(Instigator);
+	OnInteraction.Broadcast(Instigator);
 }
