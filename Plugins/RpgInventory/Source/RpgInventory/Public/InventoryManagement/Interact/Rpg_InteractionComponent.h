@@ -25,9 +25,13 @@ public:
 	// Trace throttling: 0 = every tick, >0 = seconds between traces
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") float UpdateInterval = 0.f;
 
-	// UI settings
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") TSubclassOf<UInteractPromptWidget> PromptWidgetClass;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") int32 PromptZOrder = 10;
+ // UI settings
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") TSubclassOf<UInteractPromptWidget> PromptWidgetClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") int32 PromptZOrder = 10;
+
+	// Optional always-on HUD (crosshair + prompt container). If set, the prompt will be routed into this HUD instead of a standalone widget.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") TSubclassOf<class URpg_HUDWidget> HUDWidgetClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI") int32 HUDZOrder = 0;
 
 	// Input (Enhanced Input optional)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Trace") UInputAction* InteractInputAction = nullptr;
@@ -56,15 +60,16 @@ protected:
 private:
 	TWeakObjectPtr<AActor>  CurrentTargetActor;
 	TWeakObjectPtr<UObject> CurrentInteractable; // Actor ODER Component, die UInteractable implementiert
-	UPROPERTY() UInteractPromptWidget* PromptWidget = nullptr;
+	UPROPERTY() UInteractPromptWidget* PromptWidget = nullptr; // legacy direct prompt
+	UPROPERTY() class URpg_HUDWidget* HUDWidget = nullptr;      // optional always-on HUD
 	
 	void UpdateTrace();
 	UObject* FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const;
 	void OnTargetChanged(UObject* NewInteractable, AActor* NewActor);
-
+	
 	void ShowPromptFor(UObject* InteractableObj);
 	void HidePrompt();
-
+	
 	// Server-RPC (führt Interact autoritativ aus)
 	UFUNCTION(Server, Reliable)
 	void Server_Interact(AActor* TargetActor);

@@ -32,7 +32,5 @@ public:
 
 protected:
 	// Optional bound widgets (create them in the UMG BP with the same names)
-	UPROPERTY(meta=(BindWidgetOptional)) UTextBlock* TitleText = nullptr;
-	UPROPERTY(meta=(BindWidgetOptional)) UTextBlock* ActionText = nullptr;
-	UPROPERTY(meta=(BindWidgetOptional)) UImage* IconImage = nullptr;
+	UPROPERTY(meta=(BindWidget)) UTextBlock* Text_Message = nullptr;
 };

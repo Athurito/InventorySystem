@@ -6,6 +6,7 @@
 #include "InventoryManagement/Interact/Rpg_InteractableComponent.h"
 #include "InventoryManagement/Interact/Interface/Interactable.h"
 #include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
+#include "InventoryManagement/Interact/Widget/Rpg_HUDWidget.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "GameFramework/PlayerController.h"
@@ -36,8 +37,19 @@ void URpg_InteractionComponent::BeginPlay()
 		OwnerPawn = OwnerPC->GetPawn();
 	}
 
-	// Create prompt widget on local player if a class is provided
-	if (PromptWidgetClass && PC)
+ // Create always-on HUD if class provided. If present, it will host the prompt.
+	if (HUDWidgetClass && PC)
+	{
+		HUDWidget = CreateWidget<URpg_HUDWidget>(PC, HUDWidgetClass);
+		if (HUDWidget)
+		{
+			HUDWidget->AddToViewport(HUDZOrder);
+			// Crosshair visibility can be managed in BP or here if needed.
+		}
+	}
+
+	// Legacy: create standalone prompt only if no HUD is present
+	if (!HUDWidget && PromptWidgetClass && PC)
 	{
 		PromptWidget = CreateWidget<UInteractPromptWidget>(PC, PromptWidgetClass);
 		if (PromptWidget)
@@ -175,7 +187,7 @@ void URpg_InteractionComponent::OnTargetChanged(UObject* NewInteractable, AActor
 
 void URpg_InteractionComponent::ShowPromptFor(UObject* InteractableObj)
 {
-	if (!PromptWidget || !InteractableObj) return;
+	if (!InteractableObj) return;
 
 	const FInteractDisplayData Data = IInteractable::Execute_GetDisplayData(InteractableObj);
 
@@ -185,13 +197,27 @@ void URpg_InteractionComponent::ShowPromptFor(UObject* InteractableObj)
 	FInteractDisplayData Resolved = Data;
 	Resolved.Icon = Icon; // ersetzt SoftRef durch geladenes Icon
 
-	PromptWidget->SetPromptData(Resolved);
-	PromptWidget->SetPromptVisible(true);
+	if (HUDWidget)
+	{
+		HUDWidget->ShowInteractPrompt(Resolved);
+	}
+	else if (PromptWidget)
+	{
+		PromptWidget->SetPromptData(Resolved);
+		PromptWidget->SetPromptVisible(true);
+	}
 }
 
 void URpg_InteractionComponent::HidePrompt()
 {
-	if (PromptWidget) PromptWidget->SetPromptVisible(false);
+	if (HUDWidget)
+	{
+		HUDWidget->HideInteractPrompt();
+	}
+	else if (PromptWidget)
+	{
+		PromptWidget->SetPromptVisible(false);
+	}
 }
 
 void URpg_InteractionComponent::TryInteract()

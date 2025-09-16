@@ -8,33 +8,9 @@
 
 void UInteractPromptWidget::SetPromptData(const FInteractDisplayData& Data)
 {
-	if (TitleText)
+	if (Text_Message)
 	{
-		TitleText->SetText(Data.Title);
-	}
-	if (ActionText)
-	{
-		ActionText->SetText(Data.ActionText);
-	}
-
-	// Resolve icon: might be already loaded, otherwise sync-load as fallback.
-	UTexture2D* IconTex = nullptr;
-	if (!Data.Icon.IsNull())
-	{
-		IconTex = Data.Icon.IsValid() ? Data.Icon.Get() : Data.Icon.LoadSynchronous();
-	}
-	if (IconImage)
-	{
-		if (IconTex)
-		{
-			IconImage->SetBrushFromTexture(IconTex, true);
-			IconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
-		}
-		else
-		{
-			IconImage->SetBrushFromTexture(nullptr);
-			IconImage->SetVisibility(ESlateVisibility::Collapsed);
-		}
+		Text_Message->SetText(Data.ActionText);
 	}
 }
 
