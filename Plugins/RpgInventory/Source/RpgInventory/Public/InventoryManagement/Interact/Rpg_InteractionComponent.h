@@ -8,6 +8,8 @@
 
 class UInteractPromptWidget;
 class UInputAction;
+class APlayerController;
+class APawn;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractTargetChanged, AActor*, NewTarget);
 
 
@@ -58,6 +60,12 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	// Cached state
+	TWeakObjectPtr<APlayerController> OwnerPC;
+	TWeakObjectPtr<APawn> CachedPawn;
+	float TimeSinceLastTrace = 0.f;
+
+	// Interaction selection
 	TWeakObjectPtr<AActor>  CurrentTargetActor;
 	TWeakObjectPtr<UObject> CurrentInteractable; // Actor ODER Component, die UInteractable implementiert
 	UPROPERTY() UInteractPromptWidget* PromptWidget = nullptr; // legacy direct prompt
@@ -66,13 +74,15 @@ private:
 	void UpdateTrace();
 	UObject* FindInteractableOn(AActor* Actor, UPrimitiveComponent* HitComp) const;
 	void OnTargetChanged(UObject* NewInteractable, AActor* NewActor);
-	
+		
 	void ShowPromptFor(UObject* InteractableObj);
 	void HidePrompt() const;
-	
+		
 	UFUNCTION()
 	void OnObservedActorDestroyed(AActor* DestroyedActor);
-	
+
+	void HandlePossessedPawnChanged(APawn* OldPawn, APawn* NewPawn);
+		
 	// Server-RPC (führt Interact autoritativ aus)
 	UFUNCTION(Server, Reliable)
 	void Server_Interact(AActor* TargetActor);

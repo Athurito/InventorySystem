@@ -24,23 +24,32 @@ void URpg_InteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Resolve owner pawn and player controller
+	// Resolve and cache controller/pawn
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	APlayerController* PC = nullptr;
+	OwnerPC = nullptr;
 	if (OwnerPawn)
 	{
-		PC = Cast<APlayerController>(OwnerPawn->GetController());
+		OwnerPC = Cast<APlayerController>(OwnerPawn->GetController());
 	}
-	else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+	else
 	{
-		PC = OwnerPC;
-		OwnerPawn = OwnerPC->GetPawn();
+		OwnerPC = Cast<APlayerController>(GetOwner());
 	}
+	if (!OwnerPC.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("URpg_InteractionComponent: Owner is neither a PlayerController nor has one; interaction will be disabled."));
+		SetComponentTickEnabled(false);
+		return;
+	}
+	CachedPawn = OwnerPC->GetPawn();
 
- // Create always-on HUD if class provided. If present, it will host the prompt.
-	if (HUDWidgetClass && PC)
+	// Note: Not binding to engine delegates here to keep things generic across owners.
+	// We'll detect pawn changes in Tick and update cache accordingly.
+
+	// Create always-on HUD if class provided (local controller only). If present, it will host the prompt.
+	if (HUDWidgetClass && OwnerPC->IsLocalController())
 	{
-		HUDWidget = CreateWidget<URpg_HUDWidget>(PC, HUDWidgetClass);
+		HUDWidget = CreateWidget<URpg_HUDWidget>(OwnerPC.Get(), HUDWidgetClass);
 		if (HUDWidget)
 		{
 			HUDWidget->AddToViewport(HUDZOrder);
@@ -51,9 +60,9 @@ void URpg_InteractionComponent::BeginPlay()
 	}
 
 	// Legacy: create standalone prompt only if no HUD is present
-	if (!HUDWidget && PromptWidgetClass && PC)
+	if (!HUDWidget && PromptWidgetClass && OwnerPC->IsLocalController())
 	{
-		PromptWidget = CreateWidget<UInteractPromptWidget>(PC, PromptWidgetClass);
+		PromptWidget = CreateWidget<UInteractPromptWidget>(OwnerPC.Get(), PromptWidgetClass);
 		if (PromptWidget)
 		{
 			PromptWidget->AddToViewport(PromptZOrder);
@@ -62,16 +71,16 @@ void URpg_InteractionComponent::BeginPlay()
 	}
 
 	// Try to auto-bind Enhanced Input action if configured
-	if (InteractInputAction)
+	if (InteractInputAction && OwnerPC->IsLocalController())
 	{
 		UEnhancedInputComponent* EIC = nullptr;
-		if (OwnerPawn && OwnerPawn->InputComponent)
+		if (CachedPawn.IsValid() && CachedPawn->InputComponent)
 		{
-			EIC = Cast<UEnhancedInputComponent>(OwnerPawn->InputComponent);
+			EIC = Cast<UEnhancedInputComponent>(CachedPawn->InputComponent);
 		}
-		if (!EIC && PC && PC->InputComponent)
+		if (!EIC && OwnerPC->InputComponent)
 		{
-			EIC = Cast<UEnhancedInputComponent>(PC->InputComponent);
+			EIC = Cast<UEnhancedInputComponent>(OwnerPC->InputComponent);
 		}
 		if (EIC)
 		{
@@ -82,7 +91,7 @@ void URpg_InteractionComponent::BeginPlay()
 			UE_LOG(LogTemp, Verbose, TEXT("URpg_InteractionComponent: EnhancedInputComponent not available to bind Interact."));
 		}
 	}
-	else
+	else if (!InteractInputAction)
 	{
 		UE_LOG(LogTemp, Verbose, TEXT("URpg_InteractionComponent: InteractInputAction is null; assign it in the component settings."));
 	}
@@ -90,6 +99,26 @@ void URpg_InteractionComponent::BeginPlay()
 
 void URpg_InteractionComponent::TickComponent(float DeltaTime, ELevelTick, FActorComponentTickFunction*)
 {
+	// Detect pawn change
+	if (OwnerPC.IsValid())
+	{
+		APawn* NewPawn = OwnerPC->GetPawn();
+		if (NewPawn != CachedPawn.Get())
+		{
+			HandlePossessedPawnChanged(CachedPawn.Get(), NewPawn);
+		}
+	}
+
+	// Throttle traces if requested
+	if (UpdateInterval > 0.f)
+	{
+		TimeSinceLastTrace += DeltaTime;
+		if (TimeSinceLastTrace < UpdateInterval)
+		{
+			return;
+		}
+		TimeSinceLastTrace = 0.f;
+	}
 	UpdateTrace();
 }
 
@@ -122,27 +151,16 @@ UObject* URpg_InteractionComponent::FindInteractableOn(AActor* Actor, UPrimitive
 
 void URpg_InteractionComponent::UpdateTrace()
 {
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	APlayerController* PC = nullptr;
-	if (OwnerPawn)
-	{
-		PC = Cast<APlayerController>(OwnerPawn->GetController());
-	}
-	else if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
-	{
-		PC = OwnerPC;
-		OwnerPawn = OwnerPC->GetPawn();
-	}
-	if (!PC) return;
+	if (!OwnerPC.IsValid()) return;
 
 	FVector ViewLoc; FRotator ViewRot;
-	PC->GetPlayerViewPoint(ViewLoc, ViewRot);
+	OwnerPC->GetPlayerViewPoint(ViewLoc, ViewRot);
 
 	const FVector Start = ViewLoc;
 	const FVector End   = Start + ViewRot.Vector() * TraceDistance;
 
 	FHitResult Hit;
-	AActor* IgnoreActor = OwnerPawn ? static_cast<AActor*>(OwnerPawn) : Cast<AActor>(PC);
+	AActor* IgnoreActor = CachedPawn.IsValid() ? static_cast<AActor*>(CachedPawn.Get()) : Cast<AActor>(OwnerPC.Get());
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(InteractionTrace), /*bTraceComplex*/false, IgnoreActor);
 	GetWorld()->LineTraceSingleByChannel(Hit, Start, End, TraceChannel, Params);
 
@@ -155,8 +173,8 @@ void URpg_InteractionComponent::UpdateTrace()
 	{
 		NewInteractable = FindInteractableOn(Hit.GetActor(), Hit.GetComponent());
 		NewActor = Hit.GetActor();
-		// Optional: zusätzlich CanInteract früh checken, damit UI nur erscheint, wenn echt möglich
-		if (NewInteractable && !IInteractable::Execute_CanInteract(NewInteractable, OwnerPawn))
+		// Optional: check CanInteract early; if no pawn, don't show prompt
+		if (!CachedPawn.IsValid() || (NewInteractable && !IInteractable::Execute_CanInteract(NewInteractable, CachedPawn.Get())))
 		{
 			NewInteractable = nullptr;
 			NewActor = nullptr;
@@ -166,6 +184,11 @@ void URpg_InteractionComponent::UpdateTrace()
 	if (CurrentInteractable.Get() != NewInteractable)
 	{
 		OnTargetChanged(NewInteractable, NewActor);
+	}
+	else if (!NewInteractable && CurrentInteractable.IsValid())
+	{
+		// Defensive: ensure prompt hidden if we lost pawn mid-frame
+		HidePrompt();
 	}
 }
 
@@ -246,20 +269,28 @@ void URpg_InteractionComponent::OnObservedActorDestroyed(AActor* DestroyedActor)
 	}
 }
 
-void URpg_InteractionComponent::TryInteract()
+void URpg_InteractionComponent::HandlePossessedPawnChanged(APawn* OldPawn, APawn* NewPawn)
 {
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn)
+	CachedPawn = NewPawn;
+	// Hide/clear when we lose pawn
+	if (!CachedPawn.IsValid())
 	{
-		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
+		if (CurrentInteractable.IsValid() || CurrentTargetActor.IsValid())
 		{
-			OwnerPawn = OwnerPC->GetPawn();
+			CurrentInteractable = nullptr;
+			CurrentTargetActor = nullptr;
+			HidePrompt();
+			OnInteractTargetChanged.Broadcast(nullptr);
 		}
 	}
-	if (!CurrentInteractable.IsValid() || !OwnerPawn) return;
+}
+
+void URpg_InteractionComponent::TryInteract()
+{
+	if (!CurrentInteractable.IsValid() || !CachedPawn.IsValid()) return;
 
 	// Clientseitig sanity-check
-	if (!IInteractable::Execute_CanInteract(CurrentInteractable.Get(), OwnerPawn)) return;
+	if (!IInteractable::Execute_CanInteract(CurrentInteractable.Get(), CachedPawn.Get())) return;
 
 	// Server anweisen (autoritativer Call)
 	Server_Interact(CurrentTargetActor.Get());
@@ -267,22 +298,27 @@ void URpg_InteractionComponent::TryInteract()
 
 void URpg_InteractionComponent::Server_Interact_Implementation(AActor* TargetActor)
 {
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn)
-	{
-		if (APlayerController* OwnerPC = Cast<APlayerController>(GetOwner()))
-		{
-			OwnerPawn = OwnerPC->GetPawn();
-		}
-	}
 	if (!TargetActor) return;
 
+	// Resolve authoritative pawn on server
+	APawn* ServerPawn = nullptr;
+	if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
+	{
+		ServerPawn = PC->GetPawn();
+	}
+	else if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		// Fallback for non-controller owners
+		ServerPawn = OwnerPawn;
+	}
+	if (!ServerPawn) return;
+
 	UObject* InteractableObj = FindInteractableOn(TargetActor, nullptr);
-	if (!InteractableObj || !OwnerPawn) return;
+	if (!InteractableObj) return;
 
-	if (!IInteractable::Execute_CanInteract(InteractableObj, OwnerPawn)) return;
+	if (!IInteractable::Execute_CanInteract(InteractableObj, ServerPawn)) return;
 
-	IInteractable::Execute_Interact(InteractableObj, OwnerPawn);
+	IInteractable::Execute_Interact(InteractableObj, ServerPawn);
 }
 
 
