@@ -44,6 +44,8 @@ void URpg_InteractionComponent::BeginPlay()
 		if (HUDWidget)
 		{
 			HUDWidget->AddToViewport(HUDZOrder);
+			// Ensure prompt is hidden at start (BP default might be Visible)
+			HUDWidget->HideInteractPrompt();
 			// Crosshair visibility can be managed in BP or here if needed.
 		}
 	}
@@ -169,8 +171,20 @@ void URpg_InteractionComponent::UpdateTrace()
 
 void URpg_InteractionComponent::OnTargetChanged(UObject* NewInteractable, AActor* NewActor)
 {
+	// Unbind from previous actor destruction
+	if (AActor* PrevActor = CurrentTargetActor.Get())
+	{
+		PrevActor->OnDestroyed.RemoveDynamic(this, &URpg_InteractionComponent::OnObservedActorDestroyed);
+	}
+
 	CurrentInteractable = NewInteractable;
 	CurrentTargetActor = NewActor;
+
+	// Bind to new actor destruction to auto-hide prompt when it goes away
+	if (AActor* BoundActor = CurrentTargetActor.Get())
+	{
+		BoundActor->OnDestroyed.AddUniqueDynamic(this, &URpg_InteractionComponent::OnObservedActorDestroyed);
+	}
 
 	// Notify listeners (BP/C++)
 	OnInteractTargetChanged.Broadcast(CurrentTargetActor.Get());
@@ -208,7 +222,7 @@ void URpg_InteractionComponent::ShowPromptFor(UObject* InteractableObj)
 	}
 }
 
-void URpg_InteractionComponent::HidePrompt()
+void URpg_InteractionComponent::HidePrompt() const
 {
 	if (HUDWidget)
 	{
@@ -217,6 +231,18 @@ void URpg_InteractionComponent::HidePrompt()
 	else if (PromptWidget)
 	{
 		PromptWidget->SetPromptVisible(false);
+	}
+}
+
+void URpg_InteractionComponent::OnObservedActorDestroyed(AActor* DestroyedActor)
+{
+	// If the destroyed actor was our current target, clear and hide
+	if (DestroyedActor && DestroyedActor == CurrentTargetActor.Get())
+	{
+		CurrentTargetActor = nullptr;
+		CurrentInteractable = nullptr;
+		HidePrompt();
+		OnInteractTargetChanged.Broadcast(nullptr);
 	}
 }
 
@@ -254,7 +280,6 @@ void URpg_InteractionComponent::Server_Interact_Implementation(AActor* TargetAct
 	UObject* InteractableObj = FindInteractableOn(TargetActor, nullptr);
 	if (!InteractableObj || !OwnerPawn) return;
 
-	// Sicherheit: Reichweite/CanInteract erneut am Server prüfen
 	if (!IInteractable::Execute_CanInteract(InteractableObj, OwnerPawn)) return;
 
 	IInteractable::Execute_Interact(InteractableObj, OwnerPawn);

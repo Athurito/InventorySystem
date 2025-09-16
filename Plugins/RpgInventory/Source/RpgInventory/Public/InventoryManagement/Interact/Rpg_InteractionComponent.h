@@ -68,7 +68,10 @@ private:
 	void OnTargetChanged(UObject* NewInteractable, AActor* NewActor);
 	
 	void ShowPromptFor(UObject* InteractableObj);
-	void HidePrompt();
+	void HidePrompt() const;
+	
+	UFUNCTION()
+	void OnObservedActorDestroyed(AActor* DestroyedActor);
 	
 	// Server-RPC (führt Interact autoritativ aus)
 	UFUNCTION(Server, Reliable)

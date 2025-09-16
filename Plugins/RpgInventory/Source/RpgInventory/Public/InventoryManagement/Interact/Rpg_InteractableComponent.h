@@ -24,9 +24,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	UInteractableDataAsset* InteractableData = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
-	FInteractDisplayData InlineDisplayData;
-
 	// Distance Check (optional, fürs CanInteract)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	float MaxUseDistance = 250.f;

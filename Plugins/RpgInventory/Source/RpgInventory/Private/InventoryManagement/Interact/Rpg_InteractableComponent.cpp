@@ -11,7 +11,7 @@ URpg_InteractableComponent::URpg_InteractableComponent()
 
 FInteractDisplayData URpg_InteractableComponent::GetDisplayData_Implementation() const
 {
-	return InteractableData ? InteractableData->Display : InlineDisplayData;
+	return InteractableData ? InteractableData->Display : FInteractDisplayData();
 }
 
 bool URpg_InteractableComponent::CanInteract_Implementation(APawn* Instigator) const
