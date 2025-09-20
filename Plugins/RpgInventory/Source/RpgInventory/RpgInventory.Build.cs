@@ -26,11 +26,21 @@ public class RpgInventory : ModuleRules
 			new string[]
 			{
 				"Core",
+				"Engine",
 				"UMG",
 				"CommonUI",
+				"GameplayTags",
+				"NetCore",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
+
+		// GAS for fragments (consumable/equippable)
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"GameplayAbilities",
+			"GameplayTasks"
+		});
 			
 		
 		PrivateDependencyModuleNames.AddRange(
@@ -41,6 +51,7 @@ public class RpgInventory : ModuleRules
 				"Slate",
 				"SlateCore",
 				"EnhancedInput",
+				"InputCore",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
