@@ -1,8 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Interact/Rpg_InteractableComponent.h"
+#include "InteractionManagement/Rpg_InteractableComponent.h"
+
 #include "GameFramework/Pawn.h"
+#include "InteractionManagement/Data/InteractableDataAsset.h"
 
 URpg_InteractableComponent::URpg_InteractableComponent()
 {

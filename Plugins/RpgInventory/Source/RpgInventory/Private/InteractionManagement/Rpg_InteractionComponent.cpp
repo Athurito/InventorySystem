@@ -1,10 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Interact/Rpg_InteractionComponent.h"
+#include "InteractionManagement/Rpg_InteractionComponent.h"
 
-#include "InventoryManagement/Interact/Interface/Interactable.h"
-#include "InventoryManagement/Interact/Widget/Rpg_HUDWidget.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "GameFramework/PlayerController.h"

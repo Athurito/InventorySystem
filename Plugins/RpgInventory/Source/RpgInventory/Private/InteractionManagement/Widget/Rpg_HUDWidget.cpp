@@ -1,9 +1,11 @@
-#include "InventoryManagement/Interact/Widget/Rpg_HUDWidget.h"
 
-#include "InventoryManagement/Interact/Rpg_InteractionComponent.h"
-#include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
-#include "InventoryManagement/Interact/Data/InteractableDataAsset.h"
 
+
+#include "InteractionManagement/Widget/Rpg_HUDWidget.h"
+
+#include "InteractionManagement/Rpg_InteractionComponent.h"
+#include "InteractionManagement/Data/InteractableDataAsset.h"
+#include "InteractionManagement/Widget/InteractPromptWidget.h"
 
 void URpg_HUDWidget::BindToInteraction(URpg_InteractionComponent* InteractionComp)
 {

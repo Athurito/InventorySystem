@@ -1,11 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Interact/Rpg_HUDSpawnerComponent.h"
+#include "InteractionManagement/Rpg_HUDSpawnerComponent.h"
 
-#include "InventoryManagement/Interact/Rpg_InteractionComponent.h"
-#include "InventoryManagement/Interact/Widget/Rpg_HUDWidget.h"
-
+#include "Blueprint/UserWidget.h"
+#include "InteractionManagement/Rpg_InteractionComponent.h"
+#include "InteractionManagement/Widget/Rpg_HUDWidget.h"
 
 URpg_HUDSpawnerComponent::URpg_HUDSpawnerComponent()
 {

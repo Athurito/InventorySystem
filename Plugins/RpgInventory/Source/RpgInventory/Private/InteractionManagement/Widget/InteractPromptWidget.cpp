@@ -1,10 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
-#include "Components/TextBlock.h"
+#include "InteractionManagement/Widget/InteractPromptWidget.h"
+
 #include "Components/Image.h"
-#include "InventoryManagement/Interact/Data/InteractableDataAsset.h"
+#include "Components/TextBlock.h"
+#include "InteractionManagement/Data/InteractableDataAsset.h"
 
 void UInteractPromptWidget::SetPromptData(const FInteractDisplayData& Data)
 {

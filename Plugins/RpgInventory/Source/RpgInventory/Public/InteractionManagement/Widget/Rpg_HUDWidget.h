@@ -2,10 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
-#include "InventoryManagement/Interact/Data/InteractableDataAsset.h"
-#include "InventoryManagement/Interact/Widget/InteractPromptWidget.h"
 #include "Rpg_HUDWidget.generated.h"
 
+struct FInteractDisplayData;
 class URpg_InteractionComponent;
 class UWidget;
 class UInteractPromptWidget;

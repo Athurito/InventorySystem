@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "InventoryManagement/Interact/Data/InteractableDataAsset.h"
+#include "InteractionManagement/Data/InteractableDataAsset.h"
 #include "UObject/Interface.h"
 #include "Interactable.generated.h"
 
