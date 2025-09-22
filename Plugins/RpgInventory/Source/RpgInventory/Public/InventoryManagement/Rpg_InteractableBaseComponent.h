@@ -17,14 +17,14 @@ public:
 	// Sets default values for this component's properties
 	URpg_InteractableBaseComponent();
 
-
-	// IInteractable implementations (BlueprintNativeEvent)
-	// virtual FInteractDisplayData GetDisplayData_Implementation() const override;
-	// virtual bool CanInteract_Implementation(APawn* Instigator) const override;
-	// virtual void Interact_Implementation(APawn* Instigator) override;
-
-protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
+	bool bEnabled = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
+	UInteractableDataAsset* InteractableData = nullptr;
+
+	// Distance Check (optional, fürs CanInteract)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
+	float MaxUseDistance = 250.f;
 };

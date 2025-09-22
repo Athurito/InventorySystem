@@ -20,6 +20,7 @@ class RPGINVENTORY_API UItemData : public UPrimaryDataAsset
 public:
 	TArray<TInstancedStruct<FItemFragment>>& GetFragmentsMutable() { return Fragments; }
 	TArray<TInstancedStruct<FItemFragment>> GetFragments() { return Fragments; }
+	FText GetInteractionText() const { return InteractionText; }
 
 
 	template<typename T>
@@ -48,6 +49,9 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Inventory")
 	TSubclassOf<AActor> PickupActorClass;
+	
+	UPROPERTY(EditAnywhere, Category = "Inventory")
+	FText InteractionText;
 };
 
 template <typename T> requires std::derived_from<T, FItemFragment>

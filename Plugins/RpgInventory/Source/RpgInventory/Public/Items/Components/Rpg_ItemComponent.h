@@ -16,11 +16,9 @@ class RPGINVENTORY_API URpg_ItemComponent : public URpg_InteractableBaseComponen
 	GENERATED_BODY()
 
 public:
-	URpg_ItemComponent();
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitItemData(UItemData CopyOfItemData);
+	void InitItemData(UItemData* CopyOfItemData);
 	TObjectPtr<UItemData> GetItemData() { return ItemData; }
 
 	/* IInteractable start*/
