@@ -28,6 +28,7 @@ public class RpgInventory : ModuleRules
 				"Core",
 				"UMG",
 				"CommonUI",
+				"GameplayTags",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
