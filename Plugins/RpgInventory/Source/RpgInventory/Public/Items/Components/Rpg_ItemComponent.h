@@ -21,6 +21,10 @@ public:
 	void InitItemData(UItemData* CopyOfItemData);
 	TObjectPtr<UItemData> GetItemData() { return ItemData; }
 
+	// Attempts to consume this item according to its Consumable Fragment rules
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Item")
+	bool Consume(APawn* Instigator);
+
 	/* IInteractable start*/
 	virtual FInteractDisplayData GetDisplayData_Implementation() const override;
 	virtual bool CanInteract_Implementation(APawn* Instigator) const override;

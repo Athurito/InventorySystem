@@ -22,13 +22,15 @@ public class RpgInventory : ModuleRules
 			);
 			
 		
-		PublicDependencyModuleNames.AddRange(
+  PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
 				"UMG",
 				"CommonUI",
 				"GameplayTags",
+				"GameplayAbilities",
+				"GameplayTasks",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
