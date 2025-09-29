@@ -16,13 +16,9 @@ class RPGINVENTORY_API URpg_InteractableBaseComponent : public UActorComponent, 
 public:
 	// Sets default values for this component's properties
 	URpg_InteractableBaseComponent();
-
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
 	bool bEnabled = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")
-	UInteractableDataAsset* InteractableData = nullptr;
 
 	// Distance Check (optional, fürs CanInteract)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction")

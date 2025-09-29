@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Rpg_FragmentTags.h"
 #include "UObject/Object.h"
 #include "ItemFragment.generated.h"
 
@@ -29,7 +30,6 @@ struct FItemFragment
 	
 private:
 	
-	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (Categories="FragmentTags"))
 	FGameplayTag FragmentTag = FGameplayTag::EmptyTag;
 };
 
@@ -37,11 +37,15 @@ USTRUCT(BlueprintType)
 struct FStackableFragment : public FItemFragment
 {
 	GENERATED_BODY()
+
+	FStackableFragment()
+	{
+		SetFragmentTag(FragmentTags::StackableFragment);
+	}
 	int32 GetMaxStackSize() const { return MaxStackSize; }
 	int32 GetStackCount() const { return StackCount; }
 	void SetStackCount(const int32 Count) { StackCount = Count; }
 
-	
 private:
 	UPROPERTY(EditAnywhere, Category = "Inventory")
 	int32 MaxStackSize{1};
