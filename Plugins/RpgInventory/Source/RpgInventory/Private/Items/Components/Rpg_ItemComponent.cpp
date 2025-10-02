@@ -7,6 +7,7 @@
 #include "Items/Fragments/ItemFragment.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "InventoryManagement/Components/Rpg_InventoryComponent.h"
 
 void URpg_ItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -61,9 +62,10 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 	if (Consumable->ConsumableEffect)
 	{
 		UAbilitySystemComponent* ASC = nullptr;
-		if (Instigator)
+		auto controller = Cast<APlayerController>(Instigator->GetController());
+		if (controller)
 		{
-			if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Instigator))
+			if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(controller))
 			{
 				ASC = ASI->GetAbilitySystemComponent();
 			}
@@ -129,7 +131,14 @@ bool URpg_ItemComponent::CanInteract_Implementation(APawn* Instigator) const
 
 void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 {
-	IInteractable::Interact_Implementation(Instigator);
+	auto Controller = Cast<APlayerController> ( Instigator->GetController());
+	if (auto* InventoryComponent = Controller->FindComponentByClass<URpg_InventoryComponent>())
+	{
+		if (auto ConsumableFragment = GetItemData()->GetFragmentOfTypeMutable<FConsumableFragment>())
+		{
+			InventoryComponent->TryConsumeItem(this, ConsumableFragment->QuantityPerUse);
+		}
+	}
 }
 
 void URpg_ItemComponent::BeginPlay()

@@ -50,6 +50,10 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 
 	// Validate item belongs to us or is usable; minimal check for now
 	APawn* InstigatorPawn = Cast<APawn>(GetOwner());
+
+	auto PlayerController = Cast<APlayerController>(GetOwner());
+	InstigatorPawn = PlayerController->GetPawn(); 
+	
 	if (!InstigatorPawn)
 	{
 		// Fallback: try the item's owner as instigator pawn
