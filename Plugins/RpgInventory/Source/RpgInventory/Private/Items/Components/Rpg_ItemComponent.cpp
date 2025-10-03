@@ -7,17 +7,41 @@
 #include "Items/Fragments/ItemFragment.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Controller.h"
 #include "InventoryManagement/Components/Rpg_InventoryComponent.h"
 
 void URpg_ItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ThisClass, ItemData);
+	DOREPLIFETIME(ThisClass, CurrentStackCount);
+	DOREPLIFETIME(ThisClass, MaxStackSize);
 }
 
 void URpg_ItemComponent::InitItemData(UItemData* CopyOfItemData)
 {
 	ItemData = CopyOfItemData;
+
+	// Initialize runtime stack from data asset once; do not mutate the asset
+	if (ItemData)
+	{
+		if (const FStackableFragment* Stack = ItemData->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+		{
+			MaxStackSize = FMath::Max(1, Stack->GetMaxStackSize());
+			CurrentStackCount = FMath::Clamp(Stack->GetStackCount(), 0, MaxStackSize);
+		}
+		else
+		{
+			MaxStackSize = 1;
+			CurrentStackCount = 1;
+		}
+	}
+	else
+	{
+		MaxStackSize = 1;
+		CurrentStackCount = 1;
+	}
 }
 
 bool URpg_ItemComponent::Consume(APawn* Instigator)
@@ -35,21 +59,15 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 		return false;
 	}
 
-	// Check stack if required
+	// Check runtime stack if required
 	if (Consumable->bReduceStack)
 	{
-		FStackableFragment* StackFrag = ItemData->GetFragmentOfTypeMutable<FStackableFragment>();
-		if (!StackFrag)
+		if (CurrentStackCount < Consumable->QuantityPerUse)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Consume failed: bReduceStack true but no StackableFragment present"));
+			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"), CurrentStackCount, Consumable->QuantityPerUse);
 			return false;
 		}
-		if (StackFrag->GetStackCount() < Consumable->QuantityPerUse)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"), StackFrag->GetStackCount(), Consumable->QuantityPerUse);
-			return false;
-		}
-		StackFrag->SetStackCount(StackFrag->GetStackCount() - Consumable->QuantityPerUse);
+		CurrentStackCount = FMath::Clamp(CurrentStackCount - Consumable->QuantityPerUse, 0, MaxStackSize);
 	}
 
 	// Durability not implemented yet in this module; log if requested
@@ -58,38 +76,48 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 		UE_LOG(LogTemp, Warning, TEXT("Consume: bReduceDurability is true but durability system not implemented. Skipping wear."));
 	}
 
+	// Helper to resolve an ASC from Instigator/Controller/PlayerState/Owner
+	auto ResolveASC = [](APawn* InInstigator, AActor* InOwner) -> UAbilitySystemComponent*
+	{
+		if (InInstigator)
+		{
+			// Pawn implements ASI
+			if (const IAbilitySystemInterface* ASIInst = Cast<IAbilitySystemInterface>(InInstigator))
+			{
+				if (UAbilitySystemComponent* C = ASIInst->GetAbilitySystemComponent()) return C;
+			}
+			// PlayerState usually holds ASC
+			if (APlayerState* PS = InInstigator->GetPlayerState())
+			{
+				if (const IAbilitySystemInterface* ASIPS = Cast<IAbilitySystemInterface>(PS))
+				{
+					if (UAbilitySystemComponent* C = ASIPS->GetAbilitySystemComponent()) return C;
+				}
+			}
+			// Controller may also implement
+			if (AController* Cntr = InInstigator->GetController())
+			{
+				if (const IAbilitySystemInterface* ASIC = Cast<IAbilitySystemInterface>(Cntr))
+				{
+					if (UAbilitySystemComponent* C = ASIC->GetAbilitySystemComponent()) return C;
+				}
+			}
+		}
+		// Fallback to owner of item component
+		if (InOwner)
+		{
+			if (const IAbilitySystemInterface* ASIOwner = Cast<IAbilitySystemInterface>(InOwner))
+			{
+				if (UAbilitySystemComponent* C = ASIOwner->GetAbilitySystemComponent()) return C;
+			}
+		}
+		return nullptr;
+	};
+
 	// Apply gameplay effect if possible
 	if (Consumable->ConsumableEffect)
 	{
-		UAbilitySystemComponent* ASC = nullptr;
-		auto controller = Cast<APlayerController>(Instigator->GetController());
-		if (controller)
-		{
-			if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(controller))
-			{
-				ASC = ASI->GetAbilitySystemComponent();
-			}
-			else if (AActor* InstigatorActor = Cast<AActor>(Instigator))
-			{
-				if (const IAbilitySystemInterface* ASIActor = Cast<IAbilitySystemInterface>(InstigatorActor))
-				{
-					ASC = ASIActor->GetAbilitySystemComponent();
-				}
-			}
-		}
-
-		if (!ASC)
-		{
-			// try owner
-			if (AActor* OwnerActor = GetOwner())
-			{
-				if (const IAbilitySystemInterface* ASIOwner = Cast<IAbilitySystemInterface>(OwnerActor))
-				{
-					ASC = ASIOwner->GetAbilitySystemComponent();
-				}
-			}
-		}
-
+		UAbilitySystemComponent* ASC = ResolveASC(Instigator, GetOwner());
 		if (ASC)
 		{
 			FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
@@ -131,13 +159,87 @@ bool URpg_ItemComponent::CanInteract_Implementation(APawn* Instigator) const
 
 void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 {
-	auto Controller = Cast<APlayerController> ( Instigator->GetController());
-	if (auto* InventoryComponent = Controller->FindComponentByClass<URpg_InventoryComponent>())
+	URpg_InventoryComponent* InventoryComponent = nullptr;
+
+	if (Instigator)
 	{
-		if (auto ConsumableFragment = GetItemData()->GetFragmentOfTypeMutable<FConsumableFragment>())
+		UE_LOG(LogTemp, Warning, TEXT("Interact: Instigator is valid"));
+		
+		if (AController* Controller = Instigator->GetController())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Interact: Controller is valid"));
+			
+			// Prefer Inventory on Controller
+			InventoryComponent = Controller->FindComponentByClass<URpg_InventoryComponent>();
+			if (InventoryComponent)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Controller"));
+			}
+			
+			// Fallback to PlayerState (survives level changes)
+			if (!InventoryComponent && Controller->PlayerState)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Interact: PlayerState is valid, searching for component..."));
+				InventoryComponent = Controller->PlayerState->FindComponentByClass<URpg_InventoryComponent>();
+				
+				if (InventoryComponent)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on PlayerState!"));
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("Interact: PlayerState exists but NO InventoryComponent found!"));
+				}
+			}
+			else if (!Controller->PlayerState)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Interact: PlayerState is NULL!"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Interact: Controller is NULL!"));
+		}
+		
+		// As last resort, try on Pawn itself
+		if (!InventoryComponent)
+		{
+			InventoryComponent = Instigator->FindComponentByClass<URpg_InventoryComponent>();
+			if (InventoryComponent)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Pawn"));
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Interact: Instigator is NULL!"));
+	}
+	
+	// Final fallback: try owner of this component
+	if (!InventoryComponent)
+	{
+		if (AActor* OwnerActor = GetOwner())
+		{
+			InventoryComponent = OwnerActor->FindComponentByClass<URpg_InventoryComponent>();
+			if (InventoryComponent)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Owner"));
+			}
+		}
+	}
+
+	if (InventoryComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Interact: Successfully found InventoryComponent, attempting to consume"));
+		if (const FConsumableFragment* ConsumableFragment = GetItemData()->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
 		{
 			InventoryComponent->TryConsumeItem(this, ConsumableFragment->QuantityPerUse);
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Interact: NO InventoryComponent found anywhere!"));
 	}
 }
 

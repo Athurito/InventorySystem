@@ -90,12 +90,9 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 		OnItemConsumed.Broadcast(ItemComponent, ConsumedTotal);
 
 		// If stackable and now zero, we could handle removal (minimal: log)
-		if (FStackableFragment* Stack = ItemData->GetFragmentOfTypeMutable<FStackableFragment>())
+		if (ItemComponent->GetCurrentStackCount() <= 0)
 		{
-			if (Stack->GetStackCount() <= 0)
-			{
-				UE_LOG(LogTemp, Log, TEXT("InternalConsume: Stack depleted; item should be removed from inventory"));
-			}
+			UE_LOG(LogTemp, Log, TEXT("InternalConsume: Stack depleted; item should be removed from inventory"));
 		}
 	}
 

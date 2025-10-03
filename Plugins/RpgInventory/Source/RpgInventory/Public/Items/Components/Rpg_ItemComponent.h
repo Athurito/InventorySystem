@@ -9,6 +9,7 @@
 #include "Items/ItemData.h"
 #include "Rpg_ItemComponent.generated.h"
 
+class APawn;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API URpg_ItemComponent : public URpg_InteractableBaseComponent
@@ -21,8 +22,11 @@ public:
 	void InitItemData(UItemData* CopyOfItemData);
 	TObjectPtr<UItemData> GetItemData() { return ItemData; }
 
+	// Runtime stack for this instance (replicated), initialized from ItemData's StackableFragment once
+	int32 GetCurrentStackCount() const { return CurrentStackCount; }
+	int32 GetMaxStackSize() const { return MaxStackSize; }
+
 	// Attempts to consume this item according to its Consumable Fragment rules
-	UFUNCTION(BlueprintCallable, Category = "Inventory|Item")
 	bool Consume(APawn* Instigator);
 
 	/* IInteractable start*/
@@ -38,4 +42,10 @@ private:
 
 	UPROPERTY(Replicated, EditAnywhere, Category = "Inventory")
 	TObjectPtr<UItemData> ItemData = nullptr;
+
+	// Instance runtime state (do not mutate DataAsset fragments)
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory")
+	int32 CurrentStackCount = 1;
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory")
+	int32 MaxStackSize = 1;
 };
