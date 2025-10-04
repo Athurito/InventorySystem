@@ -4,6 +4,8 @@
 #include "InventoryManagement/Components/Rpg_InventoryComponent.h"
 
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
 #include "Items/Components/Rpg_ItemComponent.h"
 #include "Items/ItemData.h"
@@ -48,11 +50,24 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 		return false;
 	}
 
-	// Validate item belongs to us or is usable; minimal check for now
-	APawn* InstigatorPawn = Cast<APawn>(GetOwner());
-
-	auto PlayerController = Cast<APlayerController>(GetOwner());
-	InstigatorPawn = PlayerController->GetPawn(); 
+	// Resolve instigator pawn from owner of this component (supports Pawn, Controller, PlayerState)
+	APawn* InstigatorPawn = nullptr;
+	AActor* OwnerActor = GetOwner();
+	if (APawn* OwnerPawn = Cast<APawn>(OwnerActor))
+	{
+		InstigatorPawn = OwnerPawn;
+	}
+	else if (APlayerController* PC = Cast<APlayerController>(OwnerActor))
+	{
+		InstigatorPawn = PC->GetPawn();
+	}
+	else if (APlayerState* PS = Cast<APlayerState>(OwnerActor))
+	{
+		if (AController* C = PS->GetOwningController())
+		{
+			InstigatorPawn = C->GetPawn();
+		}
+	}
 	
 	if (!InstigatorPawn)
 	{
