@@ -19,7 +19,7 @@ void URpg_ItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(ThisClass, MaxStackSize);
 }
 
-void URpg_ItemComponent::InitItemData(UItemData* CopyOfItemData)
+void URpg_ItemComponent::InitItemData(URpg_ItemManifest* CopyOfItemData)
 {
 	ItemData = CopyOfItemData;
 

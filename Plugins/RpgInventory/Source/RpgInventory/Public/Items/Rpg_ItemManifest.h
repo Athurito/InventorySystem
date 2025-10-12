@@ -6,14 +6,14 @@
 #include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
 #include "StructUtils/InstancedStruct.h"
-#include "ItemData.generated.h"
+#include "Rpg_ItemManifest.generated.h"
 
 struct FItemFragment;
 /**
  * 
  */
 UCLASS()
-class RPGINVENTORY_API UItemData : public UPrimaryDataAsset
+class RPGINVENTORY_API URpg_ItemManifest : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 
@@ -55,7 +55,7 @@ private:
 };
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-const T* UItemData::GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) const
+const T* URpg_ItemManifest::GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) const
 {
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -71,7 +71,7 @@ const T* UItemData::GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) co
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-const T* UItemData::GetFragmentOfType() const
+const T* URpg_ItemManifest::GetFragmentOfType() const
 {
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -84,7 +84,7 @@ const T* UItemData::GetFragmentOfType() const
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-T* UItemData::GetFragmentOfTypeMutable()
+T* URpg_ItemManifest::GetFragmentOfTypeMutable()
 {
 	for (TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -97,7 +97,7 @@ T* UItemData::GetFragmentOfTypeMutable()
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-TArray<const T*> UItemData::GetAllFragmentsOfType() const
+TArray<const T*> URpg_ItemManifest::GetAllFragmentsOfType() const
 {
 	TArray<const T*> Results;
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)
