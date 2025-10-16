@@ -8,7 +8,7 @@
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
 #include "Items/Components/Rpg_ItemComponent.h"
-#include "Items/Rpg_ItemManifest.h"
+#include "Items/Rpg_ItemDefinition.h"
 #include "Items/Fragments/ItemFragment.h"
 
 // Sets default values for this component's properties
@@ -75,7 +75,7 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 		InstigatorPawn = Cast<APawn>(ItemComponent->GetOwner());
 	}
 
-	URpg_ItemManifest* ItemData = ItemComponent->GetItemData();
+	URpg_ItemDefinition* ItemData = ItemComponent->GetItemData();
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("InternalConsume: ItemData is null"));

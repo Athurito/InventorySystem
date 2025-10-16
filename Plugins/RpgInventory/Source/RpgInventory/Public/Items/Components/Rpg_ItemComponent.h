@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "InteractionManagement/Interface/Interactable.h"
 #include "InventoryManagement/Rpg_InteractableBaseComponent.h"
-#include "Items/Rpg_ItemManifest.h"
+#include "Items/Rpg_ItemDefinition.h"
 #include "Rpg_ItemComponent.generated.h"
 
 class APawn;
@@ -19,8 +19,8 @@ class RPGINVENTORY_API URpg_ItemComponent : public URpg_InteractableBaseComponen
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitItemData(URpg_ItemManifest* CopyOfItemData);
-	TObjectPtr<URpg_ItemManifest> GetItemData() { return ItemData; }
+	void InitItemData(URpg_ItemDefinition* CopyOfItemData);
+	TObjectPtr<URpg_ItemDefinition> GetItemData() { return ItemData; }
 
 	// Runtime stack for this instance (replicated), initialized from ItemData's StackableFragment once
 	int32 GetCurrentStackCount() const { return CurrentStackCount; }
@@ -41,7 +41,7 @@ protected:
 private:
 
 	UPROPERTY(Replicated, EditAnywhere, Category = "Inventory")
-	TObjectPtr<URpg_ItemManifest> ItemData = nullptr;
+	TObjectPtr<URpg_ItemDefinition> ItemData = nullptr;
 
 	// Instance runtime state (do not mutate DataAsset fragments)
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory")

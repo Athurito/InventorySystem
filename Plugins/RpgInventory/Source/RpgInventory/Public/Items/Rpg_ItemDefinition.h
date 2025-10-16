@@ -6,14 +6,14 @@
 #include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
 #include "StructUtils/InstancedStruct.h"
-#include "Rpg_ItemManifest.generated.h"
+#include "Rpg_ItemDefinition.generated.h"
 
 struct FItemFragment;
 /**
  * 
  */
 UCLASS()
-class RPGINVENTORY_API URpg_ItemManifest : public UPrimaryDataAsset
+class RPGINVENTORY_API URpg_ItemDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 
@@ -44,18 +44,18 @@ public:
 	
 private:
 
-	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (ExcludeBaseStruct))
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory", meta = (ExcludeBaseStruct))
 	TArray<TInstancedStruct<FItemFragment>> Fragments;
 
-	UPROPERTY(EditAnywhere, Category = "Inventory")
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TSubclassOf<AActor> PickupActorClass;
 	
-	UPROPERTY(EditAnywhere, Category = "Inventory")
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	FText InteractionText;
 };
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-const T* URpg_ItemManifest::GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) const
+const T* URpg_ItemDefinition::GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) const
 {
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -71,7 +71,7 @@ const T* URpg_ItemManifest::GetFragmentOfTypeWithTag(const FGameplayTag& Fragmen
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-const T* URpg_ItemManifest::GetFragmentOfType() const
+const T* URpg_ItemDefinition::GetFragmentOfType() const
 {
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -84,7 +84,7 @@ const T* URpg_ItemManifest::GetFragmentOfType() const
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-T* URpg_ItemManifest::GetFragmentOfTypeMutable()
+T* URpg_ItemDefinition::GetFragmentOfTypeMutable()
 {
 	for (TInstancedStruct<FItemFragment>& Fragment : Fragments)
 	{
@@ -97,7 +97,7 @@ T* URpg_ItemManifest::GetFragmentOfTypeMutable()
 }
 
 template <typename T> requires std::derived_from<T, FItemFragment>
-TArray<const T*> URpg_ItemManifest::GetAllFragmentsOfType() const
+TArray<const T*> URpg_ItemDefinition::GetAllFragmentsOfType() const
 {
 	TArray<const T*> Results;
 	for (const TInstancedStruct<FItemFragment>& Fragment : Fragments)

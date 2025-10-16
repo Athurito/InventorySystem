@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Rpg_ItemManifest.h"
+#include "Rpg_ItemDefinition.h"
 #include "UObject/Object.h"
 #include "Rpg_InventoryItem.generated.h"
 
@@ -19,5 +19,5 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual bool IsSupportedForNetworking() const override {return true;};
 
-	void SetItemManifest(const URpg_ItemManifest& Manifest);
+	void SetItemManifest(const URpg_ItemDefinition& Manifest);
 };
