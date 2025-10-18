@@ -7,52 +7,115 @@
 #include "Items/Fragments/ItemFragment.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
 #include "InventoryManagement/Components/Rpg_InventoryComponent.h"
+#include "Items/Fragments/ConsumableFragment.h"
+#include "Items/Fragments/StackableFragment.h"
 
 void URpg_ItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ThisClass, ItemData);
+	DOREPLIFETIME(ThisClass, ItemId);
 	DOREPLIFETIME(ThisClass, CurrentStackCount);
-	DOREPLIFETIME(ThisClass, MaxStackSize);
 }
 
-void URpg_ItemComponent::InitItemData(URpg_ItemDefinition* CopyOfItemData)
+void URpg_ItemComponent::InitItemByDefinition(URpg_ItemDefinition* Definition)
 {
-	ItemData = CopyOfItemData;
+	check(GetOwner() && GetOwner()->HasAuthority());
 
-	// Initialize runtime stack from data asset once; do not mutate the asset
-	if (ItemData)
+	ItemDefinition = Definition;
+	ItemId   = Definition ? Definition->GetPrimaryAssetId() : FPrimaryAssetId();
+
+	InitRuntimeFromDefinition(Definition);
+}
+
+void URpg_ItemComponent::InitItemById(FPrimaryAssetId Id)
+{
+	check(GetOwner() && GetOwner()->HasAuthority());
+
+	ItemId = Id;
+	ItemDefinition = nullptr;
+
+	// Optional: sofort laden, damit Stack initialisiert werden kann
+	if (ItemId.IsValid())
 	{
-		if (const FStackableFragment* Stack = ItemData->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+		FSoftObjectPath Path = UAssetManager::Get().GetPrimaryAssetPath(ItemId);
+		if (Path.IsValid())
 		{
-			MaxStackSize = FMath::Max(1, Stack->GetMaxStackSize());
+			if (UObject* Obj = Path.TryLoad())
+			{
+				ItemDefinition = Cast<URpg_ItemDefinition>(Obj);
+			}
+		}
+	}
+	InitRuntimeFromDefinition(ItemDefinition.Get());
+}
+
+void URpg_ItemComponent::InitItemBySoft(TSoftObjectPtr<URpg_ItemDefinition> Soft)
+{
+	check(GetOwner() && GetOwner()->HasAuthority());
+	URpg_ItemDefinition* Def = Soft.IsValid() ? Soft.Get() : Soft.LoadSynchronous();
+	InitItemByDefinition(Def);
+}
+
+void URpg_ItemComponent::OnRep_ItemId()
+{
+	ItemDefinition = nullptr;
+
+	if (!ItemId.IsValid()) return;
+
+	FSoftObjectPath Path = UAssetManager::Get().GetPrimaryAssetPath(ItemId);
+	if (Path.IsValid())
+	{
+		if (UObject* Obj = Path.TryLoad()) // für kleine DataAssets ok; sonst async
+		{
+			ItemDefinition = Cast<URpg_ItemDefinition>(Obj);
+
+			// Falls Stack noch Default (z. B. bei Spawn durch Replizierung)
+			if (CurrentStackCount <= 0 || MaxStackSize <= 0)
+			{
+				InitRuntimeFromDefinition(ItemDefinition.Get());
+			}
+		}
+	}
+}
+
+void URpg_ItemComponent::OnRep_CurrentStackCount()
+{
+	// UI/FX-Refresh (Widgets, Sounds etc.)
+}
+
+void URpg_ItemComponent::InitRuntimeFromDefinition(const URpg_ItemDefinition* Def)
+{
+	if (Def)
+	{
+		if (const FStackableFragment* Stack = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+		{
+			MaxStackSize      = FMath::Max(1, Stack->GetMaxStackSize());
 			CurrentStackCount = FMath::Clamp(Stack->GetStackCount(), 0, MaxStackSize);
-		}
-		else
-		{
-			MaxStackSize = 1;
-			CurrentStackCount = 1;
+			return;
 		}
 	}
-	else
-	{
-		MaxStackSize = 1;
-		CurrentStackCount = 1;
-	}
+	MaxStackSize = 1;
+	CurrentStackCount = 1;
 }
 
 bool URpg_ItemComponent::Consume(APawn* Instigator)
 {
-	if (!ItemData)
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		// auf Clients nie State ändern
+		return false;
+	}
+	if (!ItemDefinition)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Consume failed: ItemData is null"));
 		return false;
 	}
 
-	const FConsumableFragment* Consumable = ItemData->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment);
+	const FConsumableFragment* Consumable = ItemDefinition->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment);
 	if (!Consumable)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Consume failed: No ConsumableFragment on item"));
@@ -139,11 +202,11 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 
 FInteractDisplayData URpg_ItemComponent::GetDisplayData_Implementation() const
 {
-	if (!bEnabled || !ItemData) return FInteractDisplayData();
+	if (!bEnabled || !ItemDefinition) return FInteractDisplayData();
 
 	FInteractDisplayData Data;
 	
-	Data.ActionText = ItemData->GetInteractionText();
+	Data.ActionText = ItemDefinition->GetInteractionText();
 	
 	return Data;
 }
@@ -232,7 +295,7 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 	if (InventoryComponent)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Interact: Successfully found InventoryComponent, attempting to consume"));
-		if (const FConsumableFragment* ConsumableFragment = GetItemData()->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
+		if (const FConsumableFragment* ConsumableFragment = GetItemDefinition()->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
 		{
 			InventoryComponent->TryConsumeItem(this, ConsumableFragment->QuantityPerUse);
 		}
@@ -246,5 +309,13 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 void URpg_ItemComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Level-platziert: Server übernimmt InitialDefinition einmalig
+	if (GetOwner() && GetOwner()->HasAuthority() && InitialDefinition.IsValid())
+	{
+		URpg_ItemDefinition* Def = InitialDefinition.Get();
+		if (!Def) Def = InitialDefinition.LoadSynchronous();
+		InitItemByDefinition(Def);
+	}
 }
 

@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InventorySystemPlayerController.generated.h"
 
+class UInputAction;
 class UInputMappingContext;
 class UUserWidget;
 
@@ -40,5 +41,19 @@ protected:
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
+
+
+	UPROPERTY(EditAnywhere, Category="Test")
+	TSubclassOf<AActor> DropClass;
+
+	UPROPERTY(EditAnywhere, Category="Test")
+	TSoftObjectPtr<class URpg_ItemDefinition> TestDefinition;
+
+	UFUNCTION(Server, Reliable)
+	void ServerSpawnTestItem();
+
+	void SpawnTestItem();
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction|Input") UInputAction* InteractInputAction = nullptr;
 
 };

@@ -19,8 +19,22 @@ class RPGINVENTORY_API URpg_ItemComponent : public URpg_InteractableBaseComponen
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitItemData(URpg_ItemDefinition* CopyOfItemData);
-	TObjectPtr<URpg_ItemDefinition> GetItemData() { return ItemData; }
+
+
+	// ---- Initialisierung (nur Server aufrufen) ----
+	UFUNCTION(BlueprintCallable, Category="Inventory|Init")
+	void InitItemByDefinition(URpg_ItemDefinition* Definition);
+
+	UFUNCTION(BlueprintCallable, Category="Inventory|Init")
+	void InitItemById(FPrimaryAssetId Id);
+
+	UFUNCTION(BlueprintCallable, Category="Inventory|Init")
+	void InitItemBySoft(TSoftObjectPtr<URpg_ItemDefinition> Soft);
+
+	UPROPERTY(EditInstanceOnly,BlueprintReadOnly, Category="Inventory", meta=(ExposeOnSpawn))
+	TSoftObjectPtr<URpg_ItemDefinition> InitialDefinition;
+	
+	const URpg_ItemDefinition* GetItemDefinition() const { return ItemDefinition.Get(); }
 
 	// Runtime stack for this instance (replicated), initialized from ItemData's StackableFragment once
 	int32 GetCurrentStackCount() const { return CurrentStackCount; }
@@ -39,13 +53,24 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-
-	UPROPERTY(Replicated, EditAnywhere, Category = "Inventory")
-	TObjectPtr<URpg_ItemDefinition> ItemData = nullptr;
-
-	// Instance runtime state (do not mutate DataAsset fragments)
-	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory")
+	
+	UPROPERTY(ReplicatedUsing=OnRep_ItemId)
+	FPrimaryAssetId ItemId;
+	
+	UPROPERTY(Transient)
+	TSoftObjectPtr<URpg_ItemDefinition> ItemDefinition;
+	
+	UPROPERTY(ReplicatedUsing=OnRep_CurrentStackCount)
 	int32 CurrentStackCount = 1;
-	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory")
+	
 	int32 MaxStackSize = 1;
+
+	UFUNCTION()
+	void OnRep_ItemId();
+
+	UFUNCTION()
+	void OnRep_CurrentStackCount();
+
+	void InitRuntimeFromDefinition(const URpg_ItemDefinition* Def);
+
 };

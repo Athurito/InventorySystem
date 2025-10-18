@@ -16,25 +16,23 @@ class RPGINVENTORY_API URpg_InventoryComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this component's properties
 	URpg_InventoryComponent();
 
 	// Client/UI entry point: attempts to consume the given item. Will route to server if needed.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
-	void TryConsumeItem(URpg_ItemComponent* ItemComponent, int32 Quantity /*defaults to 1 in BP*/ = 1);
+	void TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity = 1);
 
 	// Server authoritative execution
 	UFUNCTION(Server, Reliable)
-	void ServerConsumeItem(URpg_ItemComponent* ItemComponent, int32 Quantity);
+	void ServerConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity);
 
 	// Broadcast after successful consumption
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
 	FOnItemConsumedSignature OnItemConsumed;
 
 protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
-
-	bool InternalConsume(URpg_ItemComponent* ItemComponent, int32 Quantity);
+	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const; 
+private:
+	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
 };
  

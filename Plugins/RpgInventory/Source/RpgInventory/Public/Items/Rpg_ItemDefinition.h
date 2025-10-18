@@ -18,11 +18,16 @@ class RPGINVENTORY_API URpg_ItemDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override
+	{
+		return FPrimaryAssetId(TEXT("Item"), GetFName());
+	}
+	
+	const TArray<TInstancedStruct<FItemFragment>>& GetFragments() const { return Fragments; }
 	TArray<TInstancedStruct<FItemFragment>>& GetFragmentsMutable() { return Fragments; }
-	TArray<TInstancedStruct<FItemFragment>> GetFragments() { return Fragments; }
 	FText GetInteractionText() const { return InteractionText; }
-
-
+	
 	template<typename T>
 	requires std::derived_from<T, FItemFragment>
 	const T* GetFragmentOfTypeWithTag(const FGameplayTag& FragmentTag) const;
@@ -38,6 +43,9 @@ public:
 	template<typename T>
 	requires std::derived_from<T, FItemFragment>
 	TArray<const T*> GetAllFragmentsOfType() const;
+	
+	template<typename T>
+	bool HasFragment() const { return GetFragmentOfType<T>() != nullptr; }
 
 	void SpawnPickupActor(const UObject* WorldContextObject, const FVector& SpawnLocation, const FRotator& SpawnRotation);
 
@@ -48,7 +56,7 @@ private:
 	TArray<TInstancedStruct<FItemFragment>> Fragments;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
-	TSubclassOf<AActor> PickupActorClass;
+	TSoftClassPtr<AActor> PickupActorClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	FText InteractionText;

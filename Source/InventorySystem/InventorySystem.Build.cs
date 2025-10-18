@@ -24,7 +24,7 @@ public class InventorySystem : ModuleRules
 			"GameplayTasks"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RpgInventory" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"InventorySystem",
