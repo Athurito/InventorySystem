@@ -34,6 +34,14 @@ void URpg_InventoryComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, 
 	}
 }
 
+void URpg_InventoryComponent::AddRepSubObject(UObject* SubObject)
+{
+	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
+	{
+		AddReplicatedSubObject(SubObject);
+	}
+}
+
 void URpg_InventoryComponent::ServerConsumeItem_Implementation(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
 	if (!ItemComponent || !IsValid(ItemComponent) || !IsValid(ItemComponent->GetOwner())) return;
