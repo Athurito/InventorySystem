@@ -9,11 +9,18 @@
 #include "Items/Components/Rpg_ItemComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
 #include "Items/Fragments/ConsumableFragment.h"
+#include "Net/UnrealNetwork.h"
 
 URpg_InventoryComponent::URpg_InventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+}
+
+void URpg_InventoryComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(URpg_InventoryComponent, InventoryList);
 }
 
 void URpg_InventoryComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)

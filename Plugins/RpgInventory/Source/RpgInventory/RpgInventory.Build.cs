@@ -31,6 +31,7 @@ public class RpgInventory : ModuleRules
 				"GameplayTags",
 				"GameplayAbilities",
 				"GameplayTasks",
+				"NetCore"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

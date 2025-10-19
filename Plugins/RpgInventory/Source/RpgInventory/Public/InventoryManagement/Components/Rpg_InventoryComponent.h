@@ -19,7 +19,7 @@ class RPGINVENTORY_API URpg_InventoryComponent : public UActorComponent
 
 public:
 	URpg_InventoryComponent();
-
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	// Client/UI entry point: attempts to consume the given item. Will route to server if needed.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
 	void TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity = 1);

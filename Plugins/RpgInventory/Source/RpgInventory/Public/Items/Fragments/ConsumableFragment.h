@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ItemFragment.h"
-#include "Items/Fragments/Rpg_FragmentTags.h"
+#include "Rpg_FragmentTags.h"
+
 #include "ConsumableFragment.generated.h"
 
 class UGameplayEffect;
