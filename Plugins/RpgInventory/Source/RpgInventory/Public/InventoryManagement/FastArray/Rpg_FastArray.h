@@ -32,16 +32,20 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	
 	int32 GetStack() const {return Stack;}
 	void SetStack(const int32 NewStack) {Stack = NewStack;}
+	int32 GetMaxStack() const { return MaxStack; }
+	void SetMaxStack(const int32 InMax) { MaxStack = FMath::Max(1, InMax); }
 
 	FGameplayTag GetItemType() const {return ItemType;}
 	void SetItemType(const FGameplayTag& NewItemType) {ItemType = NewItemType;}
 	
 	bool IsStackable() const;
 	bool IsConsumable() const;
+	bool CanStackWith(const FInv_InventoryEntry& Other, const int32 MaxStackParam) const { return ItemId == Other.ItemId && Stack < MaxStackParam; }
 private:
 	UPROPERTY() FGuid           InstanceId;  
 	UPROPERTY() FPrimaryAssetId ItemId;      
 	UPROPERTY() int32           Stack = 1;
+	UPROPERTY() int32           MaxStack = 1;
 	FGameplayTag ItemType = FGameplayTag::EmptyTag;
 	
 };
@@ -72,6 +76,16 @@ struct FInvContainer : public FFastArraySerializer
 		return FastArrayDeltaSerialize<FInv_InventoryEntry, FInvContainer>(Entries, DeltaParam, *this);
 	}
 
+public:
+	void SetOwner(UActorComponent* InOwner) { OwnerComponent = InOwner; }
+	int32 GetNum() const { return Entries.Num(); }
+	const TArray<FInv_InventoryEntry>& GetEntries() const { return Entries; }
+	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
+	int32 FindIndexByInstance(const FGuid& InstanceId) const;
+	// Auto-stack add; returns how many actually added and the (last) instance id used/created
+	int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
+	// Remove quantity from an instance; removes entry when stack hits 0
+	bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 private:
 	//Replicated list of items
 	UPROPERTY()

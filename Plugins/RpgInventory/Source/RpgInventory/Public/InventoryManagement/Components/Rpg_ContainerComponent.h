@@ -38,6 +38,21 @@ public:
 	// Runtime Container (Meta + FastArray)
 	UPROPERTY(Replicated) TArray<FInvContainer> Containers;
 
+	/** Add / Remove / Transfer **/
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool AddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
+
+	UFUNCTION(Server, Reliable)
+	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerRemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity);
+
 	/** Consumption **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
 	void TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity = 1);
@@ -45,15 +60,15 @@ public:
 	// Server authoritative execution
 	UFUNCTION(Server, Reliable)
 	void ServerConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity);
-
+	
 	
 	// Broadcast after successful consumption
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
 	FOnItemConsumedSignature OnItemConsumed;
-
+	
 	FInventoryItemChange OnItemAdded;
 	FInventoryItemChange OnItemRemoved;
-
+	
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
@@ -61,6 +76,9 @@ protected:
 	virtual void BeginPlay() override;
 private:
 	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
+	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
+	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
+	bool InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
 
 	UPROPERTY(Replicated)
 	FInvContainer InventoryList;

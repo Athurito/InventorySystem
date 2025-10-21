@@ -114,7 +114,7 @@ void URpg_ContainerComponent::BeginPlay()
 		const UInventoryContainerDefinition* Def = SoftDef.IsValid() ? SoftDef.Get() : SoftDef.LoadSynchronous();
 		if (!Def) continue;
 
-		FInvContainer C;
+		FInvContainer C(this);
 		C.DisplayName  = Def->DisplayName;
 		C.Type         = Def->Type;
 		C.Rows         = Def->Rows;
@@ -151,4 +151,132 @@ APawn* URpg_ContainerComponent::ResolveInstigator(const URpg_ItemComponent* Item
 		InstigatorPawn = Cast<APawn>(ItemComponent->GetOwner());
 	}
 	return InstigatorPawn;
+}
+
+
+bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
+{
+	OutAdded = 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (!ItemComponent || Quantity <= 0) return false;
+	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+
+	const URpg_ItemDefinition* Def = ItemComponent->GetItemDefinition();
+	if (!Def) return false;
+
+	FInvContainer& Cont = Containers[ContainerIndex];
+	const FGameplayTag ItemType = Def->GetItemType();
+	const FPrimaryAssetId ItemId = Def->GetPrimaryAssetId();
+	const int32 MaxStack = FMath::Max(1, ItemComponent->GetMaxStackSize());
+
+	int32 Added = 0;
+	FGuid UsedInstance;
+	const int32 LastIndex = Cont.AddOrStack(ItemId, ItemType, MaxStack, Quantity, UsedInstance, Added);
+	OutAdded = Added;
+	OutInstanceId = UsedInstance;
+	return LastIndex != INDEX_NONE || Added > 0;
+}
+
+bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)
+{
+	OutRemoved = 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+	return Containers[ContainerIndex].RemoveByInstance(InstanceId, Quantity, OutRemoved);
+}
+
+bool URpg_ContainerComponent::InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved)
+{
+	OutMoved = 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (!TargetComponent) return false;
+	if (!Containers.IsValidIndex(SourceContainerIndex)) return false;
+	if (!TargetComponent->Containers.IsValidIndex(TargetContainerIndex)) return false;
+
+	FInvContainer& Src = Containers[SourceContainerIndex];
+	FInvContainer& Dst = TargetComponent->Containers[TargetContainerIndex];
+
+	// Block transfer within the same component if types are identical (player inventory rule)
+	if (TargetComponent == this && Src.Type == Dst.Type)
+	{
+		return false;
+	}
+	const int32 SrcIdx = Src.FindIndexByInstance(InstanceId);
+	if (SrcIdx == INDEX_NONE) return false;
+	const FInv_InventoryEntry SrcEntry = Src.GetEntries()[SrcIdx];
+	// Respect destination allowed items
+	if (!Dst.IsItemAllowed(SrcEntry.GetItemType())) return false;
+
+	int32 Remaining = Quantity;
+	if (Remaining <= 0) return false;
+
+	// Use the entry's stored max stack size
+	int32 MaxStack = FMath::Max(1, SrcEntry.GetMaxStack());
+
+	FGuid NewInstanceId = InstanceId;
+	int32 Added = 0;
+	Dst.AddOrStack(SrcEntry.GetItemId(), SrcEntry.GetItemType(), MaxStack, Remaining, NewInstanceId, Added);
+	if (Added <= 0) return false;
+	int32 Removed = 0;
+	Src.RemoveByInstance(InstanceId, Added, Removed);
+	OutMoved = FMath::Min(Added, Removed);
+	return OutMoved > 0;
+}
+
+bool URpg_ContainerComponent::AddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		return InternalAddItem(ContainerIndex, ItemComponent, Quantity, OutAdded, OutInstanceId);
+	}
+	else
+	{
+		ServerAddItemToContainer(ContainerIndex, ItemComponent, Quantity);
+		OutAdded = 0; // will update via replication
+		OutInstanceId.Invalidate();
+		return false;
+	}
+}
+
+bool URpg_ContainerComponent::RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		return InternalRemoveItem(ContainerIndex, InstanceId, Quantity, OutRemoved);
+	}
+	else
+	{
+		ServerRemoveItemFromContainer(ContainerIndex, InstanceId, Quantity);
+		OutRemoved = 0;
+		return false;
+	}
+}
+
+bool URpg_ContainerComponent::TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved)
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		return InternalTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity, OutMoved);
+	}
+	else
+	{
+		ServerTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity);
+		OutMoved = 0;
+		return false;
+	}
+}
+
+void URpg_ContainerComponent::ServerAddItemToContainer_Implementation(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity)
+{
+	int32 DummyAdded; FGuid DummyId; InternalAddItem(ContainerIndex, ItemComponent, Quantity, DummyAdded, DummyId);
+}
+
+void URpg_ContainerComponent::ServerRemoveItemFromContainer_Implementation(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity)
+{
+	int32 DummyRemoved; InternalRemoveItem(ContainerIndex, InstanceId, Quantity, DummyRemoved);
+}
+
+void URpg_ContainerComponent::ServerTransferItem_Implementation(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity)
+{
+	int32 Dummy; InternalTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity, Dummy);
 }

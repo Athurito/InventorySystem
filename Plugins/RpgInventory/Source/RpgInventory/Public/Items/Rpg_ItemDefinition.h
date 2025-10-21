@@ -27,6 +27,7 @@ public:
 	const TArray<TInstancedStruct<FItemFragment>>& GetFragments() const { return Fragments; }
 	TArray<TInstancedStruct<FItemFragment>>& GetFragmentsMutable() { return Fragments; }
 	FText GetInteractionText() const { return InteractionText; }
+	const FGameplayTag& GetItemType() const { return ItemType; }
 	
 	template<typename T>
 	requires std::derived_from<T, FItemFragment>
