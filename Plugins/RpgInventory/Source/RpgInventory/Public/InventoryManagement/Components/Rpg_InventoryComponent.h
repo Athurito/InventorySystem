@@ -7,10 +7,20 @@
 #include "InventoryManagement/FastArray/Rpg_FastArray.h"
 #include "Rpg_InventoryComponent.generated.h"
 
+
+USTRUCT(BlueprintType)
+struct FInvContainerEntry
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type;
+	UPROPERTY(BlueprintReadOnly) int32 Index; // Index im Containers-Array
+};
+
 class URpg_ItemComponent;
 
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_ItemComponent*, ItemComponent, int32, QuantityUsed);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryItemChange, URpg_InventoryItem*, Item);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryItemChange, FInv_InventoryEntry, Item);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API URpg_InventoryComponent : public UActorComponent
@@ -20,7 +30,15 @@ class RPGINVENTORY_API URpg_InventoryComponent : public UActorComponent
 public:
 	URpg_InventoryComponent();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
-	// Client/UI entry point: attempts to consume the given item. Will route to server if needed.
+
+	// Initial Container-Defs (im Editor/Blueprint setzen)
+	UPROPERTY(EditDefaultsOnly, Category="Inventory")
+	TArray<TSoftObjectPtr<UInventoryContainerDefinition>> InitialContainerDefs;
+
+	// Runtime Container (Meta + FastArray)
+	UPROPERTY(Replicated) TArray<FInvContainer> Containers;
+
+	/** Consumption **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
 	void TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity = 1);
 
@@ -28,9 +46,6 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity);
 
-
-
-	void AddRepSubObject(UObject* SubObject);
 	
 	// Broadcast after successful consumption
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
@@ -39,12 +54,15 @@ public:
 	FInventoryItemChange OnItemAdded;
 	FInventoryItemChange OnItemRemoved;
 
+	void AddRepSubObject(UObject* SubObject);
 protected:
-	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const; 
+	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
+
+	virtual void BeginPlay() override;
 private:
 	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
 
 	UPROPERTY(Replicated)
-	FInv_InventoryFastArray InventoryList;
+	FInvContainer InventoryList;
 };
  

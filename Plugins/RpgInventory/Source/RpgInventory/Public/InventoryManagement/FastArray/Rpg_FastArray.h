@@ -4,15 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "Net/Serialization/FastArraySerializer.h"
 #include "Rpg_FastArray.generated.h"
 
 class URpg_ItemComponent;
-class URpg_InventoryItem;
 class URpg_InventoryComponent;
 /**
  * 
  */
+
+UENUM(BlueprintType)
+enum class EInv_ItemCategory : uint8 { Generic, Consumable, Quest, Equipment };
 /** A single entry in an inventory */
 USTRUCT(BlueprintType)
 struct FInv_InventoryEntry : public FFastArraySerializerItem
@@ -21,26 +24,44 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	
 	FInv_InventoryEntry() {  }
 
-private:
-	friend struct FInv_InventoryFastArray;
-	friend URpg_InventoryComponent;
+	FGuid GetInstanceId() const {return InstanceId;}
+	void SetInstanceId(const FGuid NewInstanceId) {InstanceId = NewInstanceId;}
 	
-	UPROPERTY()
-	TObjectPtr<URpg_InventoryItem> Item = nullptr;
+	FPrimaryAssetId GetItemId() const {return ItemId;}
+	void SetItemId(const FPrimaryAssetId& NewItemId) {ItemId = NewItemId;}
+	
+	int32 GetStack() const {return Stack;}
+	void SetStack(const int32 NewStack) {Stack = NewStack;}
+
+	FGameplayTag GetItemType() const {return ItemType;}
+	void SetItemType(const FGameplayTag& NewItemType) {ItemType = NewItemType;}
+	
+	bool IsStackable() const;
+	bool IsConsumable() const;
+private:
+	UPROPERTY() FGuid           InstanceId;  
+	UPROPERTY() FPrimaryAssetId ItemId;      
+	UPROPERTY() int32           Stack = 1;
+	FGameplayTag ItemType = FGameplayTag::EmptyTag;
 	
 };
 
-/** A single entry in an inventory */
 USTRUCT(BlueprintType)
-struct FInv_InventoryFastArray : public FFastArraySerializer
+struct FInvContainer : public FFastArraySerializer
 {
 	GENERATED_BODY()
 
-	FInv_InventoryFastArray() : OwnerComponent(nullptr) { }
-	FInv_InventoryFastArray(UActorComponent* InOwnerComponent) : OwnerComponent(InOwnerComponent) { }
+	FInvContainer() : OwnerComponent(nullptr) { }
+	explicit FInvContainer(UActorComponent* InOwnerComponent) : OwnerComponent(InOwnerComponent) { }
 
-	TArray<URpg_InventoryItem*> GetAllItems() const;
-
+	// --- Meta (nicht/dauerhaft, selten geändert) ---
+	UPROPERTY(BlueprintReadOnly) FText  DisplayName;
+	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type = EInventorySlotType::Generic;
+	UPROPERTY(BlueprintReadOnly) int32 Rows = 5;
+	UPROPERTY(BlueprintReadOnly) int32 Cols = 6;
+	UPROPERTY() FGameplayTagQuery AllowedItems; // für Add-Validierung
+	UPROPERTY() TObjectPtr<UTexture2D> TabIcon = nullptr;
+	
 	// FFastArraySerializer contract
 	void PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize);
 	void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize);
@@ -48,18 +69,10 @@ struct FInv_InventoryFastArray : public FFastArraySerializer
 
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParam)
 	{
-		return FastArrayDeltaSerialize<FInv_InventoryEntry, FInv_InventoryFastArray>(Entries, DeltaParam, *this);
+		return FastArrayDeltaSerialize<FInv_InventoryEntry, FInvContainer>(Entries, DeltaParam, *this);
 	}
 
-	URpg_InventoryItem* AddEntry(URpg_ItemComponent* ItemComponent);
-	URpg_InventoryItem* AddEntry(URpg_InventoryItem* Item);
-	void RemoveEntry(URpg_InventoryItem* Item);
-
-	URpg_InventoryItem* FindFirstItemByType(const FGameplayTag& ItemType) const;
-
 private:
-	friend URpg_InventoryComponent;
-	
 	//Replicated list of items
 	UPROPERTY()
 	TArray<FInv_InventoryEntry> Entries;
@@ -69,7 +82,7 @@ private:
 };
 
 template<>
-struct TStructOpsTypeTraits<FInv_InventoryFastArray> : TStructOpsTypeTraitsBase2<FInv_InventoryFastArray>
+struct TStructOpsTypeTraits<FInvContainer> : TStructOpsTypeTraitsBase2<FInvContainer>
 {
 	enum  { WithNetDeltaSerializer = true };
 };

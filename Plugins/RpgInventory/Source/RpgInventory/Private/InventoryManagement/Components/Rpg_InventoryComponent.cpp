@@ -23,6 +23,7 @@ void URpg_InventoryComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 	DOREPLIFETIME(URpg_InventoryComponent, InventoryList);
 }
 
+
 void URpg_InventoryComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
 	if (!ItemComponent || Quantity <= 0)
@@ -100,6 +101,29 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 	return true;
 }
 
+void URpg_InventoryComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	Containers.Reset();
+	for (const auto& SoftDef : InitialContainerDefs)
+	{
+		const UInventoryContainerDefinition* Def = SoftDef.IsValid() ? SoftDef.Get() : SoftDef.LoadSynchronous();
+		if (!Def) continue;
+
+		FInvContainer C;
+		C.DisplayName  = Def->DisplayName;
+		C.Type         = Def->Type;
+		C.Rows         = Def->Rows;
+		C.Cols         = Def->Cols;
+		C.AllowedItems = Def->AllowedItems;
+		C.TabIcon      = Def->TabIcon;
+		Containers.Add(MoveTemp(C));
+	}
+}
+
 APawn* URpg_InventoryComponent::ResolveInstigator(const URpg_ItemComponent* ItemComponent) const
 {
 	APawn* InstigatorPawn = nullptr;
@@ -127,4 +151,3 @@ APawn* URpg_InventoryComponent::ResolveInstigator(const URpg_ItemComponent* Item
 	}
 	return InstigatorPawn;
 }
-

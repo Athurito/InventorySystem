@@ -55,6 +55,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory", meta = (ExcludeBaseStruct))
 	TArray<TInstancedStruct<FItemFragment>> Fragments;
 
+	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (Categories="GameItems"))
+	FGameplayTag ItemType;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TSoftClassPtr<AActor> PickupActorClass;
 	
