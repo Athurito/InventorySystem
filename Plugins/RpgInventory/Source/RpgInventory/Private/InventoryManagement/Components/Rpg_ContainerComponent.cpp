@@ -1,7 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Components/Rpg_InventoryComponent.h"
+#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
+
 
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
@@ -11,20 +12,20 @@
 #include "Items/Fragments/ConsumableFragment.h"
 #include "Net/UnrealNetwork.h"
 
-URpg_InventoryComponent::URpg_InventoryComponent()
+URpg_ContainerComponent::URpg_ContainerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
 
-void URpg_InventoryComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(URpg_InventoryComponent, InventoryList);
+	DOREPLIFETIME(URpg_ContainerComponent, InventoryList);
 }
 
 
-void URpg_InventoryComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)
+void URpg_ContainerComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
 	if (!ItemComponent || Quantity <= 0)
 	{
@@ -42,7 +43,7 @@ void URpg_InventoryComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, 
 	}
 }
 
-void URpg_InventoryComponent::AddRepSubObject(UObject* SubObject)
+void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 {
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
 	{
@@ -50,13 +51,13 @@ void URpg_InventoryComponent::AddRepSubObject(UObject* SubObject)
 	}
 }
 
-void URpg_InventoryComponent::ServerConsumeItem_Implementation(URpg_ItemComponent* ItemComponent, const int32 Quantity)
+void URpg_ContainerComponent::ServerConsumeItem_Implementation(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
 	if (!ItemComponent || !IsValid(ItemComponent) || !IsValid(ItemComponent->GetOwner())) return;
 	InternalConsume(ItemComponent, Quantity);
 }
 
-bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent, int32 const Quantity) const
+bool URpg_ContainerComponent::InternalConsume(URpg_ItemComponent* ItemComponent, int32 const Quantity) const
 {
 	ensure(GetOwner() && GetOwner()->HasAuthority());
 	
@@ -101,7 +102,7 @@ bool URpg_InventoryComponent::InternalConsume(URpg_ItemComponent* ItemComponent,
 	return true;
 }
 
-void URpg_InventoryComponent::BeginPlay()
+void URpg_ContainerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -124,7 +125,7 @@ void URpg_InventoryComponent::BeginPlay()
 	}
 }
 
-APawn* URpg_InventoryComponent::ResolveInstigator(const URpg_ItemComponent* ItemComponent) const
+APawn* URpg_ContainerComponent::ResolveInstigator(const URpg_ItemComponent* ItemComponent) const
 {
 	APawn* InstigatorPawn = nullptr;
 	AActor* OwnerActor = GetOwner();

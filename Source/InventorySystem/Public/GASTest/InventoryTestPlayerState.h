@@ -7,7 +7,7 @@
 #include "GameFramework/PlayerState.h"
 #include "InventoryTestPlayerState.generated.h"
 
-class URpg_InventoryComponent;
+class URpg_ContainerComponent;
 class UInventoryTestAttributeSet;
 class UAbilitySystemComponent;
 /**

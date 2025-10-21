@@ -10,7 +10,7 @@
 #include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
-#include "InventoryManagement/Components/Rpg_InventoryComponent.h"
+#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Items/Fragments/ConsumableFragment.h"
 #include "Items/Fragments/StackableFragment.h"
 
@@ -222,7 +222,7 @@ bool URpg_ItemComponent::CanInteract_Implementation(APawn* Instigator) const
 
 void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 {
-	URpg_InventoryComponent* InventoryComponent = nullptr;
+	URpg_ContainerComponent* InventoryComponent = nullptr;
 
 	if (Instigator)
 	{
@@ -233,7 +233,7 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 			UE_LOG(LogTemp, Warning, TEXT("Interact: Controller is valid"));
 			
 			// Prefer Inventory on Controller
-			InventoryComponent = Controller->FindComponentByClass<URpg_InventoryComponent>();
+			InventoryComponent = Controller->FindComponentByClass<URpg_ContainerComponent>();
 			if (InventoryComponent)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Controller"));
@@ -243,7 +243,7 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 			if (!InventoryComponent && Controller->PlayerState)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Interact: PlayerState is valid, searching for component..."));
-				InventoryComponent = Controller->PlayerState->FindComponentByClass<URpg_InventoryComponent>();
+				InventoryComponent = Controller->PlayerState->FindComponentByClass<URpg_ContainerComponent>();
 				
 				if (InventoryComponent)
 				{
@@ -267,7 +267,7 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 		// As last resort, try on Pawn itself
 		if (!InventoryComponent)
 		{
-			InventoryComponent = Instigator->FindComponentByClass<URpg_InventoryComponent>();
+			InventoryComponent = Instigator->FindComponentByClass<URpg_ContainerComponent>();
 			if (InventoryComponent)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Pawn"));
@@ -284,7 +284,7 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 	{
 		if (AActor* OwnerActor = GetOwner())
 		{
-			InventoryComponent = OwnerActor->FindComponentByClass<URpg_InventoryComponent>();
+			InventoryComponent = OwnerActor->FindComponentByClass<URpg_ContainerComponent>();
 			if (InventoryComponent)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Owner"));

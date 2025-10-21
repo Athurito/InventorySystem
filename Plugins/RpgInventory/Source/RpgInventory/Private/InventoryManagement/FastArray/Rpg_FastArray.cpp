@@ -2,12 +2,12 @@
 
 #include "InventoryManagement/FastArray/Rpg_FastArray.h"
 
-#include "InventoryManagement/Components/Rpg_InventoryComponent.h"
+#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 
 
 void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
-	const TObjectPtr<URpg_InventoryComponent> InventoryComponent = Cast<URpg_InventoryComponent>(OwnerComponent);
+	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
 
 	if (!InventoryComponent)
 	{
@@ -22,7 +22,7 @@ void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, 
 
 void FInvContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
-	const TObjectPtr<URpg_InventoryComponent> InventoryComponent = Cast<URpg_InventoryComponent>(OwnerComponent);
+	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
 
 	if (!InventoryComponent)
 	{

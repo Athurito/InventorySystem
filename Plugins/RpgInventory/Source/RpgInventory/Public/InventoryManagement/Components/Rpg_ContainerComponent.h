@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "InventoryManagement/FastArray/Rpg_FastArray.h"
-#include "Rpg_InventoryComponent.generated.h"
+#include "Rpg_ContainerComponent.generated.h"
 
 
 USTRUCT(BlueprintType)
@@ -23,12 +23,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_Item
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryItemChange, FInv_InventoryEntry, Item);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
-class RPGINVENTORY_API URpg_InventoryComponent : public UActorComponent
+class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	URpg_InventoryComponent();
+	URpg_ContainerComponent();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// Initial Container-Defs (im Editor/Blueprint setzen)

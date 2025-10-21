@@ -9,7 +9,7 @@
 #include "Rpg_FastArray.generated.h"
 
 class URpg_ItemComponent;
-class URpg_InventoryComponent;
+class URpg_ContainerComponent;
 /**
  * 
  */
