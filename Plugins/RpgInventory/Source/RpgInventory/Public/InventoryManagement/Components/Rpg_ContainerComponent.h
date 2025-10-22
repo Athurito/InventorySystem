@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "InventoryManagement/FastArray/Rpg_FastArray.h"
+#include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
 
 
@@ -12,8 +13,8 @@ USTRUCT(BlueprintType)
 struct FInvContainerEntry
 {
 	GENERATED_BODY()
-	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type;
-	UPROPERTY(BlueprintReadOnly) int32 Index; // Index im Containers-Array
+	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type = EInventorySlotType::Generic;
+	UPROPERTY(BlueprintReadOnly) int32 Index = INDEX_NONE; // Index im Containers-Array
 };
 
 class URpg_ItemComponent;
@@ -42,12 +43,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool AddItemToContainerById(int32 ContainerIndex, FPrimaryAssetId ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerAddItemToContainerById(int32 ContainerIndex, FPrimaryAssetId ItemId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
 	void ServerRemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
@@ -77,6 +82,7 @@ protected:
 private:
 	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
+	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	bool InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
 

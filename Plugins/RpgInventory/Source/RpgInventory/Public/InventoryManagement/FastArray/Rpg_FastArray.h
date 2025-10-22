@@ -10,12 +10,7 @@
 
 class URpg_ItemComponent;
 class URpg_ContainerComponent;
-/**
- * 
- */
 
-UENUM(BlueprintType)
-enum class EInv_ItemCategory : uint8 { Generic, Consumable, Quest, Equipment };
 /** A single entry in an inventory */
 USTRUCT(BlueprintType)
 struct FInv_InventoryEntry : public FFastArraySerializerItem

@@ -10,7 +10,10 @@
 #include "Items/Components/Rpg_ItemComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
 #include "Items/Fragments/ConsumableFragment.h"
+#include "Items/Fragments/StackableFragment.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/AssetManager.h"
+#include "InventoryManagement/Utils/InventoryStatics.h"
 
 URpg_ContainerComponent::URpg_ContainerComponent()
 {
@@ -164,10 +167,35 @@ bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemCom
 	const URpg_ItemDefinition* Def = ItemComponent->GetItemDefinition();
 	if (!Def) return false;
 
-	FInvContainer& Cont = Containers[ContainerIndex];
+	return InternalAddItemById(ContainerIndex, Def->GetPrimaryAssetId(), Quantity, OutAdded, OutInstanceId);
+}
+
+bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)
+{
+	OutRemoved = 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+	return Containers[ContainerIndex].RemoveByInstance(InstanceId, Quantity, OutRemoved);
+}
+
+bool URpg_ContainerComponent::InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
+{
+	OutAdded = 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (Quantity <= 0) return false;
+	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+	
+	URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(ItemId);
+
+	if (!Def)
+	{
+		return false; // could not resolve definition from id
+	}
+	
+ 	FInvContainer& Cont = Containers[ContainerIndex];
 	const FGameplayTag ItemType = Def->GetItemType();
-	const FPrimaryAssetId ItemId = Def->GetPrimaryAssetId();
-	const int32 MaxStack = FMath::Max(1, ItemComponent->GetMaxStackSize());
+	const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
+	const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
 
 	int32 Added = 0;
 	FGuid UsedInstance;
@@ -177,12 +205,19 @@ bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemCom
 	return LastIndex != INDEX_NONE || Added > 0;
 }
 
-bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)
+bool URpg_ContainerComponent::AddItemToContainerById(int32 ContainerIndex, FPrimaryAssetId ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
 {
-	OutRemoved = 0;
-	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
-	if (!Containers.IsValidIndex(ContainerIndex)) return false;
-	return Containers[ContainerIndex].RemoveByInstance(InstanceId, Quantity, OutRemoved);
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		return InternalAddItemById(ContainerIndex, ItemId, Quantity, OutAdded, OutInstanceId);
+	}
+	else
+	{
+		ServerAddItemToContainerById(ContainerIndex, ItemId, Quantity);
+		OutAdded = 0; // will update via replication
+		OutInstanceId.Invalidate();
+		return false;
+	}
 }
 
 bool URpg_ContainerComponent::InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved)
@@ -210,8 +245,15 @@ bool URpg_ContainerComponent::InternalTransferItem(URpg_ContainerComponent* Targ
 	int32 Remaining = Quantity;
 	if (Remaining <= 0) return false;
 
-	// Use the entry's stored max stack size
-	int32 MaxStack = FMath::Max(1, SrcEntry.GetMaxStack());
+	URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(SrcEntry.GetItemId());
+
+	if (!Def)
+	{
+		return false; // could not resolve definition from id
+	}
+	
+	const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
+	const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
 
 	FGuid NewInstanceId = InstanceId;
 	int32 Added = 0;
@@ -274,6 +316,11 @@ void URpg_ContainerComponent::ServerAddItemToContainer_Implementation(int32 Cont
 void URpg_ContainerComponent::ServerRemoveItemFromContainer_Implementation(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity)
 {
 	int32 DummyRemoved; InternalRemoveItem(ContainerIndex, InstanceId, Quantity, DummyRemoved);
+}
+
+void URpg_ContainerComponent::ServerAddItemToContainerById_Implementation(int32 ContainerIndex, FPrimaryAssetId ItemId, int32 Quantity)
+{
+	int32 DummyAdded; FGuid DummyId; InternalAddItemById(ContainerIndex, ItemId, Quantity, DummyAdded, DummyId);
 }
 
 void URpg_ContainerComponent::ServerTransferItem_Implementation(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity)
