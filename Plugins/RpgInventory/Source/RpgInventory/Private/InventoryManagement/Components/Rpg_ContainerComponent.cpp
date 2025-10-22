@@ -308,6 +308,89 @@ bool URpg_ContainerComponent::TransferItem(URpg_ContainerComponent* TargetCompon
 	}
 }
 
+bool URpg_ContainerComponent::AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved)
+{
+	OutTotalMoved = 0;
+
+	// Route to server if not authoritative
+	if (!(GetOwner() && GetOwner()->HasAuthority()))
+	{
+		ServerAutoDepositMatchingTo(TargetComponent, TargetContainerIndex);
+		return false; // UI will update via replication callbacks
+	}
+
+	if (!TargetComponent) return false;
+	if (!TargetComponent->Containers.IsValidIndex(TargetContainerIndex)) return false;
+
+	FInvContainer& Dst = TargetComponent->Containers[TargetContainerIndex];
+
+	// 1) Collect item ids that already exist in destination
+	TSet<FPrimaryAssetId> ExistingIds;
+	for (const FInv_InventoryEntry& E : Dst.GetEntries())
+	{
+		ExistingIds.Add(E.GetItemId());
+	}
+	if (ExistingIds.Num() == 0)
+	{
+		// Nothing in destination — don't introduce new types
+		return false;
+	}
+
+	// 2) Iterate all our source containers
+	for (int32 SrcIdx = 0; SrcIdx < Containers.Num(); ++SrcIdx)
+	{
+		if (!Containers.IsValidIndex(SrcIdx)) continue;
+		FInvContainer& Src = Containers[SrcIdx];
+
+		// Optional rule: within same component block moves between identical types
+		if (TargetComponent == this && Src.Type == Dst.Type)
+		{
+			continue;
+		}
+
+		// Copy candidate instance ids up-front to avoid iterator invalidation on remove
+		TArray<FGuid> CandidateInstances;
+		CandidateInstances.Reserve(Src.GetEntries().Num());
+		for (const FInv_InventoryEntry& E : Src.GetEntries())
+		{
+			if (ExistingIds.Contains(E.GetItemId()))
+			{
+				CandidateInstances.Add(E.GetInstanceId());
+			}
+		}
+
+		for (const FGuid& InstanceId : CandidateInstances)
+		{
+			const int32 Index = Src.FindIndexByInstance(InstanceId);
+			if (Index == INDEX_NONE) continue;
+			const FInv_InventoryEntry SrcEntry = Src.GetEntries()[Index];
+
+			// Respect destination allowed items
+			if (!Dst.IsItemAllowed(SrcEntry.GetItemType())) continue;
+
+			// Resolve MaxStack from definition
+			URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(SrcEntry.GetItemId());
+			if (!Def) continue;
+			const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
+			const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
+
+			int32 Remaining = SrcEntry.GetStack();
+			if (Remaining <= 0) continue;
+
+			FGuid NewInstanceId = InstanceId;
+			int32 Added = 0;
+			Dst.AddOrStack(SrcEntry.GetItemId(), SrcEntry.GetItemType(), MaxStack, Remaining, NewInstanceId, Added);
+			if (Added <= 0) continue;
+
+			int32 Removed = 0;
+			Src.RemoveByInstance(InstanceId, Added, Removed);
+			OutTotalMoved += FMath::Min(Added, Removed);
+		}
+	}
+
+	return OutTotalMoved > 0;
+}
+
 void URpg_ContainerComponent::ServerAddItemToContainer_Implementation(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity)
 {
 	int32 DummyAdded; FGuid DummyId; InternalAddItem(ContainerIndex, ItemComponent, Quantity, DummyAdded, DummyId);
@@ -326,4 +409,10 @@ void URpg_ContainerComponent::ServerAddItemToContainerById_Implementation(int32 
 void URpg_ContainerComponent::ServerTransferItem_Implementation(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity)
 {
 	int32 Dummy; InternalTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity, Dummy);
+}
+
+void URpg_ContainerComponent::ServerAutoDepositMatchingTo_Implementation(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex)
+{
+	int32 DummyMoved = 0;
+	AutoDepositMatchingTo(TargetComponent, TargetContainerIndex, DummyMoved);
 }

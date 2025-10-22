@@ -48,6 +48,9 @@ public:
 	bool RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
+	// Auto-deposit only items that already exist in target container (hotkey support)
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
@@ -57,6 +60,8 @@ public:
 	void ServerRemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
 	void ServerTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerAutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex);
 
 	/** Consumption **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
