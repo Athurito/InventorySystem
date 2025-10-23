@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "InventoryStatics.generated.h"
 
+class URpg_ContainerComponent;
 class URpg_ItemDefinition;
 /**
  * 
@@ -19,4 +20,5 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	static URpg_ItemDefinition* GetItemDefinitionById(const FPrimaryAssetId& ItemId);
+	static URpg_ContainerComponent* GetContainerComponent(AActor* Owner);
 };

@@ -4,6 +4,7 @@
 #include "InventoryManagement/Utils/InventoryStatics.h"
 
 #include "Engine/AssetManager.h"
+#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
 
 
@@ -21,3 +22,15 @@ URpg_ItemDefinition* UInventoryStatics::GetItemDefinitionById(const FPrimaryAsse
 	}
 	return Def;
 }
+
+URpg_ContainerComponent* UInventoryStatics::GetContainerComponent(AActor* Owner)
+{
+	if (!IsValid(Owner))
+	{
+		return nullptr;
+	}
+
+	return Owner->FindComponentByClass<URpg_ContainerComponent>();
+}
+
+
