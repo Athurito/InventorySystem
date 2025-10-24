@@ -8,6 +8,7 @@
 class URpg_HUDWidget;
 class URpg_InteractionComponent;
 class APlayerController;
+class UCommonActivatableWidget;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API URpg_HUDSpawnerComponent : public UActorComponent
@@ -25,8 +26,18 @@ public:
 	int32 HUDZOrder = 0;
 
 	// Zugriff für Blueprints (optional)
-	UFUNCTION(BlueprintCallable, Category="HUD")
+	UFUNCTION(BlueprintPure, Category="HUD")
 	URpg_HUDWidget* GetHUD() const { return HUDWidget; }
+
+	// Forwarding-APIs für den Inventory/UI-Stack des HUD-Widgets
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass);
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PushInventoryContextInstance(UCommonActivatableWidget* WidgetInstance);
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PopInventoryContext();
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void ClearInventoryContext();
 
 protected:
 	virtual void BeginPlay() override;

@@ -6,6 +6,8 @@
 #include "InteractionManagement/Rpg_InteractionComponent.h"
 #include "InteractionManagement/Data/InteractableDataAsset.h"
 #include "InteractionManagement/Widget/InteractPromptWidget.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
+#include "CommonActivatableWidget.h"
 
 void URpg_HUDWidget::BindToInteraction(URpg_InteractionComponent* InteractionComp)
 {
@@ -50,4 +52,43 @@ void URpg_HUDWidget::HideInteractPrompt()
 	{
 		InteractPrompt->SetPromptVisible(false);
 	}
+}
+
+void URpg_HUDWidget::PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass)
+{
+	if (!InventoryStack || !WidgetClass)
+	{
+		return;
+	}
+	InventoryStack->AddWidget(WidgetClass);
+}
+
+void URpg_HUDWidget::PushInventoryContextInstance(UCommonActivatableWidget* WidgetInstance)
+{
+	if (!InventoryStack || !WidgetInstance)
+	{
+		return;
+	}
+	InventoryStack->AddWidgetInstance(*WidgetInstance);
+}
+
+void URpg_HUDWidget::PopInventoryContext()
+{
+	if (!InventoryStack)
+	{
+		return;
+	}
+	if (UCommonActivatableWidget* Active = InventoryStack->GetActiveWidget())
+	{
+		InventoryStack->RemoveWidget(*Active);
+	}
+}
+
+void URpg_HUDWidget::ClearInventoryContext()
+{
+	if (!InventoryStack)
+	{
+		return;
+	}
+	InventoryStack->ClearWidgets();
 }

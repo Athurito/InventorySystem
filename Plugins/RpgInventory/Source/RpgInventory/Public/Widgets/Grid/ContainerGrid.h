@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,18 +8,46 @@
 class UContainerSlotButton;
 class URpg_ContainerComponent;
 /**
- * 
+ * Ein generisches Grid-Widget, das eine ContainerComponent repräsentiert.
+ * Baut die eigentliche Darstellung nicht hart im Code auf, sondern stellt
+ * Bind/Metadata-Funktionen bereit, damit Blueprints flexibel die UI anlegen können.
  */
 UCLASS()
 class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
 {
 	GENERATED_BODY()
 
-private:
+public:
+	// Verknüpft dieses Grid mit einer ContainerComponent und einem ContainerIndex (z. B. 0 = Player-Inventory)
+	UFUNCTION(BlueprintCallable, Category="Container|UI")
+	void BindToContainer(URpg_ContainerComponent* InComponent, int32 InContainerIndex);
+
+	// Liefert die in der Definition hinterlegte Zeilen-/Spaltenanzahl
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	int32 GetRows() const { return CachedRows; }
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	int32 GetCols() const { return CachedCols; }
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	int32 GetTotalSlots() const { return CachedRows * CachedCols; }
+
+	// Optional: Zugriff auf die gebundene Komponente und den Index
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	URpg_ContainerComponent* GetBoundComponent() const { return ContainerComponent.Get(); }
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	int32 GetBoundContainerIndex() const { return ContainerIndex; }
+
+protected:
 	virtual void NativeOnInitialized() override;
 
-	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
+private:
+	void CacheFromDefinition();
 
+	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
+	int32 ContainerIndex = INDEX_NONE;
+	int32 CachedRows = 0;
+	int32 CachedCols = 0;
+
+	// Optional in UMG bindbar: Ein TileView, das als Grid fungieren kann, wenn genutzt
 	UPROPERTY(meta=(BindWidget))
 	TObjectPtr<UCommonTileView> TileView = nullptr;
 

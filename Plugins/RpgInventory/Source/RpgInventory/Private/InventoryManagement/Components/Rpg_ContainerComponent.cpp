@@ -24,7 +24,7 @@ URpg_ContainerComponent::URpg_ContainerComponent()
 void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(URpg_ContainerComponent, InventoryList);
+	DOREPLIFETIME(URpg_ContainerComponent, Containers);
 }
 
 

@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "InteractionManagement/Rpg_InteractionComponent.h"
 #include "InteractionManagement/Widget/Rpg_HUDWidget.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
+#include "CommonActivatableWidget.h"
 
 URpg_HUDSpawnerComponent::URpg_HUDSpawnerComponent()
 {
@@ -60,3 +62,36 @@ void URpg_HUDSpawnerComponent::BindHUDToControllerInteraction()
 	HUDWidget->BindToInteraction(Interaction);
 }
 
+
+
+void URpg_HUDSpawnerComponent::PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass)
+{
+	if (HUDWidget)
+	{
+		HUDWidget->PushInventoryContextClass(WidgetClass);
+	}
+}
+
+void URpg_HUDSpawnerComponent::PushInventoryContextInstance(UCommonActivatableWidget* WidgetInstance)
+{
+	if (HUDWidget)
+	{
+		HUDWidget->PushInventoryContextInstance(WidgetInstance);
+	}
+}
+
+void URpg_HUDSpawnerComponent::PopInventoryContext()
+{
+	if (HUDWidget)
+	{
+		HUDWidget->PopInventoryContext();
+	}
+}
+
+void URpg_HUDSpawnerComponent::ClearInventoryContext()
+{
+	if (HUDWidget)
+	{
+		HUDWidget->ClearInventoryContext();
+	}
+}

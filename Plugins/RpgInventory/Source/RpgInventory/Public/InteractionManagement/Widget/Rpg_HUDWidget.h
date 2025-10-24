@@ -8,6 +8,8 @@ struct FInteractDisplayData;
 class URpg_InteractionComponent;
 class UWidget;
 class UInteractPromptWidget;
+class UCommonActivatableWidgetStack;
+class UCommonActivatableWidget;
 
 UCLASS()
 class RPGINVENTORY_API URpg_HUDWidget : public UCommonUserWidget
@@ -26,8 +28,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="HUD")
 	void HideInteractPrompt();
 
+	// Inventory/UI Stack Steuerung (CommonUI)
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass);
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PushInventoryContextInstance(UCommonActivatableWidget* WidgetInstance);
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void PopInventoryContext();
+	UFUNCTION(BlueprintCallable, Category="HUD|Inventory")
+	void ClearInventoryContext();
+
 protected:
 	UPROPERTY(meta=(BindWidget)) UInteractPromptWidget* InteractPrompt = nullptr;
+	// Optionaler Stack, im UMG platzieren und binden
+	UPROPERTY(meta=(BindWidgetOptional)) UCommonActivatableWidgetStack* InventoryStack = nullptr;
 	// Event-Handler
 	UFUNCTION()
 	void HandlePromptChanged(bool bVisible, FInteractDisplayData Data);
