@@ -27,6 +27,9 @@ public:
 	
 	FInv_InventoryEntry* GetInventoryItem() const { return InventoryItem; }
 
+	void UpdateText() const;
+	void UpdateIcon(UTexture2D* Icon) const;
+
 private:
 	int32 SlotIndex{INDEX_NONE};
 	int32 StackCount{0};

@@ -1,12 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "CommonTileView.h"
 #include "CommonUserWidget.h"
 #include "ContainerGrid.generated.h"
 
 class UContainerSlotButton;
 class URpg_ContainerComponent;
+class UUniformGridPanel;
 /**
  * Ein generisches Grid-Widget, das eine ContainerComponent repräsentiert.
  * Baut die eigentliche Darstellung nicht hart im Code auf, sondern stellt
@@ -41,15 +41,16 @@ protected:
 
 private:
 	void CacheFromDefinition();
+	void RebuildGrid();
 
 	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
 	int32 ContainerIndex = INDEX_NONE;
 	int32 CachedRows = 0;
 	int32 CachedCols = 0;
 
-	// Optional in UMG bindbar: Ein TileView, das als Grid fungieren kann, wenn genutzt
+	// Root-Panel für das manuelle Grid-Layout (im UMG-Designer anlegen und binden)
 	UPROPERTY(meta=(BindWidget))
-	TObjectPtr<UCommonTileView> TileView = nullptr;
+	TObjectPtr<UUniformGridPanel> GridRoot = nullptr;
 
 	// Entry-Klasse für jeden Slot (Button/Widget). Im Editor setzbar.
 	UPROPERTY(EditDefaultsOnly, Category="Container|UI")

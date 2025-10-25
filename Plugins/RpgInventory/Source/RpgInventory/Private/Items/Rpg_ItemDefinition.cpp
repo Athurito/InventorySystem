@@ -3,6 +3,11 @@
 
 #include "Items/Rpg_ItemDefinition.h"
 
+UTexture2D* URpg_ItemDefinition::GetIcon() const
+{
+	return Icon.LoadSynchronous();
+}
+
 void URpg_ItemDefinition::SpawnPickupActor(const UObject* WorldContextObject, const FVector& SpawnLocation,
                                            const FRotator& SpawnRotation)
 {

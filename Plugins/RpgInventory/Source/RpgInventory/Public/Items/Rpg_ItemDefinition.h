@@ -28,6 +28,8 @@ public:
 	TArray<TInstancedStruct<FItemFragment>>& GetFragmentsMutable() { return Fragments; }
 	FText GetInteractionText() const { return InteractionText; }
 	const FGameplayTag& GetItemType() const { return ItemType; }
+
+	UTexture2D* GetIcon() const;
 	
 	template<typename T>
 	requires std::derived_from<T, FItemFragment>
@@ -64,6 +66,9 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	FText InteractionText;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
+	TSoftObjectPtr<UTexture2D> Icon;
 };
 
 template <typename T> requires std::derived_from<T, FItemFragment>
