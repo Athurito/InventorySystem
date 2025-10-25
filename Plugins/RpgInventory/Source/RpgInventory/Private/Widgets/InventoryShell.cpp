@@ -6,6 +6,7 @@
 #include "Components/Overlay.h"
 #include "Widgets/Grid/ContainerGrid.h"
 #include "InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "InventoryManagement/Utils/InventoryStatics.h"
 
 void UInventoryShell::NativeOnInitialized()
 {
@@ -49,10 +50,30 @@ void UInventoryShell::SetContextWidget(UWidget* InWidget)
 
 void UInventoryShell::ApplyPlayerBinding()
 {
-	if (PlayerInventoryGrid && PlayerContainerComponent.IsValid())
-	{
-		PlayerInventoryGrid->BindToContainer(PlayerContainerComponent.Get(), PlayerContainerIndex);
-	}
+    // Auto-resolve the local player's container if not explicitly initialized
+    if (!PlayerContainerComponent.IsValid())
+    {
+        if (APlayerController* PC = GetOwningPlayer())
+        {
+            AActor* OwnerActor = PC->PlayerState ? static_cast<AActor*>(PC->PlayerState) : static_cast<AActor*>(PC);
+            if (OwnerActor)
+            {
+                if (URpg_ContainerComponent* AutoComp = UInventoryStatics::GetContainerComponent(OwnerActor))
+                {
+                    PlayerContainerComponent = AutoComp;
+                    if (PlayerContainerIndex == INDEX_NONE)
+                    {
+                        PlayerContainerIndex = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    if (PlayerInventoryGrid && PlayerContainerComponent.IsValid())
+    {
+        PlayerInventoryGrid->BindToContainer(PlayerContainerComponent.Get(), PlayerContainerIndex);
+    }
 }
 
 void UInventoryShell::ApplyContextWidget()
