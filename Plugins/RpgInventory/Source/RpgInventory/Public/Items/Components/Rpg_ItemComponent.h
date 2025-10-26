@@ -7,6 +7,8 @@
 #include "InteractionManagement/Interface/Interactable.h"
 #include "InventoryManagement/Rpg_InteractableBaseComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
+#include "GameplayTagContainer.h"
+#include "Items/Runtime/ItemRuntimeData.h"
 #include "Rpg_ItemComponent.generated.h"
 
 class APawn;
@@ -36,9 +38,9 @@ public:
 	
 	const URpg_ItemDefinition* GetItemDefinition() const { return ItemDefinition.Get(); }
 
-	// Runtime stack for this instance (replicated), initialized from ItemData's StackableFragment once
-	int32 GetCurrentStackCount() const { return CurrentStackCount; }
-	int32 GetMaxStackSize() const { return MaxStackSize; }
+	// Runtime stack access via RuntimeData (single source of truth)
+	int32 GetCurrentStackCount() const;
+	int32 GetMaxStackSize() const;
 
 	// Attempts to consume this item according to its Consumable Fragment rules
 	bool Consume(APawn* Instigator);
@@ -52,6 +54,20 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+public:
+	// Runtime data access helpers keyed by fragment tag
+	template<typename T>
+	T* GetMutableFragmentData(const FGameplayTag& Key)
+	{
+		return RuntimeData.FindMutable<T>(Key);
+	}
+
+	template<typename T>
+	T* GetOrCreateMutableFragmentData(const FGameplayTag& Key)
+	{
+		return RuntimeData.FindOrAddMutable<T>(Key);
+	}
+
 private:
 	
 	UPROPERTY(ReplicatedUsing=OnRep_ItemId)
@@ -59,18 +75,17 @@ private:
 	
 	UPROPERTY(Transient)
 	TSoftObjectPtr<URpg_ItemDefinition> ItemDefinition;
-	
-	UPROPERTY(ReplicatedUsing=OnRep_CurrentStackCount)
-	int32 CurrentStackCount = 1;
-	
-	int32 MaxStackSize = 1;
+
+	// Modular runtime data container (delta replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_RuntimeData)
+	FItemRuntimeDataContainer RuntimeData;
 
 	UFUNCTION()
 	void OnRep_ItemId();
 
 	UFUNCTION()
-	void OnRep_CurrentStackCount();
-
+	void OnRep_RuntimeData();
+	
 	void InitRuntimeFromDefinition(const URpg_ItemDefinition* Def);
-
+		
 };

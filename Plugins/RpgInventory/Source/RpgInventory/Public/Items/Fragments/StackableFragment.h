@@ -20,13 +20,8 @@ struct FStackableFragment : public FItemFragment
 		SetFragmentTag(FragmentTags::StackableFragment);
 	}
 	int32 GetMaxStackSize() const { return MaxStackSize; }
-	int32 GetStackCount() const { return StackCount; }
-	void SetStackCount(const int32 Count) { StackCount = Count; }
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Inventory")
 	int32 MaxStackSize{1};
-	
-	UPROPERTY(EditAnywhere, Category = "Inventory")
-	int32 StackCount{1};
 };

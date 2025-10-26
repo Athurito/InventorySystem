@@ -13,12 +13,35 @@
 #include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Items/Fragments/ConsumableFragment.h"
 #include "Items/Fragments/StackableFragment.h"
+#include "Items/Runtime/ItemRuntimeData.h"
+#include "Items/Fragments/Rpg_FragmentTags.h"
 
 void URpg_ItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ThisClass, ItemId);
-	DOREPLIFETIME(ThisClass, CurrentStackCount);
+	DOREPLIFETIME(ThisClass, RuntimeData);
+}
+
+int32 URpg_ItemComponent::GetMaxStackSize() const
+{
+	if (const URpg_ItemDefinition* Def = GetItemDefinition())
+	{
+		if (const FStackableFragment* Frag = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+		{
+			return FMath::Max(1, Frag->GetMaxStackSize());
+		}
+	}
+	return 1;
+}
+
+int32 URpg_ItemComponent::GetCurrentStackCount() const
+{
+	if (const FStackableRuntimeData* Data = RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment))
+	{
+		return Data->CurrentStackCount;
+	}
+	return 1;
 }
 
 void URpg_ItemComponent::InitItemByDefinition(URpg_ItemDefinition* Definition)
@@ -72,34 +95,36 @@ void URpg_ItemComponent::OnRep_ItemId()
 		if (UObject* Obj = Path.TryLoad()) // für kleine DataAssets ok; sonst async
 		{
 			ItemDefinition = Cast<URpg_ItemDefinition>(Obj);
-
-			// Falls Stack noch Default (z. B. bei Spawn durch Replizierung)
-			if (CurrentStackCount <= 0 || MaxStackSize <= 0)
-			{
-				InitRuntimeFromDefinition(ItemDefinition.Get());
-			}
+			// Initialize/refresh runtime data on clients when definition arrives
+			InitRuntimeFromDefinition(ItemDefinition.Get());
 		}
 	}
 }
 
-void URpg_ItemComponent::OnRep_CurrentStackCount()
+void URpg_ItemComponent::OnRep_RuntimeData()
 {
-	// UI/FX-Refresh (Widgets, Sounds etc.)
+	// UI/FX-Refresh (Widgets, Sounds etc.) could be triggered here if needed
 }
 
 void URpg_ItemComponent::InitRuntimeFromDefinition(const URpg_ItemDefinition* Def)
 {
 	if (Def)
 	{
+		// Initialize Stackable runtime data if definition has the fragment
 		if (const FStackableFragment* Stack = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
 		{
-			MaxStackSize      = FMath::Max(1, Stack->GetMaxStackSize());
-			// CurrentStackCount = FMath::Clamp(Stack->GetStackCount(), 0, MaxStackSize);
-			return;
+			const int32 Max = FMath::Max(1, Stack->GetMaxStackSize());
+			if (FStackableRuntimeData* StackData = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
+			{
+				if (StackData->CurrentStackCount <= 0)
+				{
+					StackData->CurrentStackCount = 1;
+				}
+				StackData->CurrentStackCount = FMath::Clamp(StackData->CurrentStackCount, 1, Max);
+				RuntimeData.MarkDirty(FragmentTags::StackableFragment);
+			}
 		}
 	}
-	MaxStackSize = 1;
-	CurrentStackCount = 1;
 }
 
 bool URpg_ItemComponent::Consume(APawn* Instigator)
@@ -125,12 +150,21 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 	// Check runtime stack if required
 	if (Consumable->bReduceStack)
 	{
-		if (CurrentStackCount < Consumable->QuantityPerUse)
+		int32 Max = GetMaxStackSize();
+		FStackableRuntimeData* StackData = RuntimeData.FindMutable<FStackableRuntimeData>(FragmentTags::StackableFragment);
+		int32 Current = StackData ? StackData->CurrentStackCount : 1;
+		if (Current < Consumable->QuantityPerUse)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"), CurrentStackCount, Consumable->QuantityPerUse);
+			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"), Current, Consumable->QuantityPerUse);
 			return false;
 		}
-		CurrentStackCount = FMath::Clamp(CurrentStackCount - Consumable->QuantityPerUse, 0, MaxStackSize);
+		Current = FMath::Clamp(Current - Consumable->QuantityPerUse, 0, Max);
+		if (!StackData)
+		{
+			StackData = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment);
+		}
+		StackData->CurrentStackCount = Current;
+		RuntimeData.MarkDirty(FragmentTags::StackableFragment);
 	}
 
 	// Durability not implemented yet in this module; log if requested

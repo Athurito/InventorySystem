@@ -22,7 +22,7 @@ public class RpgInventory : ModuleRules
 			);
 			
 		
-  PublicDependencyModuleNames.AddRange(
+		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
@@ -31,7 +31,8 @@ public class RpgInventory : ModuleRules
 				"GameplayTags",
 				"GameplayAbilities",
 				"GameplayTasks",
-				"NetCore"
+				"NetCore",
+				"StructUtils"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
