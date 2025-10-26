@@ -94,7 +94,7 @@ void URpg_ItemComponent::InitRuntimeFromDefinition(const URpg_ItemDefinition* De
 		if (const FStackableFragment* Stack = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
 		{
 			MaxStackSize      = FMath::Max(1, Stack->GetMaxStackSize());
-			CurrentStackCount = FMath::Clamp(Stack->GetStackCount(), 0, MaxStackSize);
+			// CurrentStackCount = FMath::Clamp(Stack->GetStackCount(), 0, MaxStackSize);
 			return;
 		}
 	}

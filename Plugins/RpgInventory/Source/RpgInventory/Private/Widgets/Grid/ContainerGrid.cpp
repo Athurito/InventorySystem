@@ -51,6 +51,9 @@ void UContainerGrid::RebuildGrid()
 		return;
 	}
 
+	// Cache für Item Definitions erstellen
+	TMap<FPrimaryAssetId, URpg_ItemDefinition*> DefinitionCache;
+
 	// Create buttons in row-major order
 	const int32 Total = GetTotalSlots();
 	for (int32 Index = 0; Index < Total; ++Index)
@@ -64,7 +67,7 @@ void UContainerGrid::RebuildGrid()
 			continue;
 		}
 		SlotWidget->SetSlotIndex(Index);
-
+		
 		// Optional: simple stack display if entries align 1:1 with slots
 		if (const URpg_ContainerComponent* Comp = ContainerComponent.Get())
 		{
@@ -74,12 +77,29 @@ void UContainerGrid::RebuildGrid()
 				if (C.GetEntries().IsValidIndex(Index))
 				{
 					auto& Entry = C.GetEntries()[Index];
-					const auto* ItemDefinition = UInventoryStatics::GetItemDefinitionById(Entry.GetItemId());
-					SlotWidget->SetStackCount(Entry.GetStack());
-					auto icon = ItemDefinition->GetIcon();
-					SlotWidget->UpdateIcon(icon);
-					SlotWidget->UpdateText();
+					const FPrimaryAssetId& ItemId = Entry.GetItemId();
+
+					// Prüfen ob Definition bereits im Cache ist, sonst laden und cachen
+					URpg_ItemDefinition** CachedDef = DefinitionCache.Find(ItemId);
+					URpg_ItemDefinition* ItemDefinition = nullptr;
 					
+					if (CachedDef)
+					{
+						ItemDefinition = *CachedDef;
+					}
+					else
+					{
+						ItemDefinition = UInventoryStatics::GetItemDefinitionById(ItemId);
+						DefinitionCache.Add(ItemId, ItemDefinition);
+					}
+
+					if (ItemDefinition)
+					{
+						SlotWidget->SetStackCount(Entry.GetStack());
+						const auto Icon = ItemDefinition->GetIcon();
+						SlotWidget->UpdateIcon(Icon);
+						SlotWidget->UpdateText();
+					}
 				}
 			}
 		}
