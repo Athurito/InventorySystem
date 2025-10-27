@@ -6,6 +6,8 @@
 #include "GameplayTagContainer.h"
 #include "InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "Net/Serialization/FastArraySerializer.h"
+#include "Items/Runtime/ItemRuntimeData.h"
+#include "Items/Fragments/Rpg_FragmentTags.h"
 #include "Rpg_FastArray.generated.h"
 
 class URpg_ItemComponent;
@@ -25,22 +27,36 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	FPrimaryAssetId GetItemId() const {return ItemId;}
 	void SetItemId(const FPrimaryAssetId& NewItemId) {ItemId = NewItemId;}
 	
-	int32 GetStack() const {return Stack;}
-	void SetStack(const int32 NewStack) {Stack = NewStack;}
-	int32 GetMaxStack() const { return MaxStack; }
-	void SetMaxStack(const int32 InMax) { MaxStack = FMath::Max(1, InMax); }
+	int32 GetStack() const {
+		if (const FStackableRuntimeData* D = RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment))
+		{
+			return D->CurrentStackCount;
+		}
+		// Default wenn kein StackableRuntimeData existiert
+		return 1;
+	}
+	void SetStack(const int32 NewStack) {
+		if (FStackableRuntimeData* D = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
+		{
+			D->CurrentStackCount = NewStack;
+		}
+	}
 
 	FGameplayTag GetItemType() const {return ItemType;}
 	void SetItemType(const FGameplayTag& NewItemType) {ItemType = NewItemType;}
+
+	// Access to runtime data (for container/component bridging)
+	const FItemRuntimeDataContainer& GetRuntimeData() const { return RuntimeData; }
+	FItemRuntimeDataContainer& GetRuntimeDataMutable() { return RuntimeData; }
+	void CopyRuntimeDataFrom(const FItemRuntimeDataContainer& Src) { RuntimeData = Src; }
 	
 	bool IsStackable() const;
 	bool IsConsumable() const;
-	bool CanStackWith(const FInv_InventoryEntry& Other, const int32 MaxStackParam) const { return ItemId == Other.ItemId && Stack < MaxStackParam; }
+	bool CanStackWith(const FInv_InventoryEntry& Other, const int32 MaxStackParam) const { return ItemId == Other.ItemId && GetStack() < MaxStackParam; }
 private:
 	UPROPERTY() FGuid           InstanceId;  
 	UPROPERTY() FPrimaryAssetId ItemId;      
-	UPROPERTY() int32           Stack = 1;
-	UPROPERTY() int32           MaxStack = 1;
+	UPROPERTY() FItemRuntimeDataContainer RuntimeData;
 	FGameplayTag ItemType = FGameplayTag::EmptyTag;
 	
 };
@@ -77,8 +93,10 @@ public:
 	const TArray<FInv_InventoryEntry>& GetEntries() const { return Entries; }
 	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
 	int32 FindIndexByInstance(const FGuid& InstanceId) const;
-	// Auto-stack add; returns how many actually added and the (last) instance id used/created
-	int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
+	FInv_InventoryEntry* FindEntryMutableByInstance(const FGuid& InstanceId);
+	// Auto-stack add; returns how many actually added and the (last) instance id used/created.
+	// If SourceRuntimeData is provided, it will be copied into any newly created stack (not applied to existing stacks).
+ int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
 	// Remove quantity from an instance; removes entry when stack hits 0
 	bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 private:

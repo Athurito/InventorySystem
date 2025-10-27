@@ -167,7 +167,29 @@ bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemCom
 	const URpg_ItemDefinition* Def = ItemComponent->GetItemDefinition();
 	if (!Def) return false;
 
-	return InternalAddItemById(ContainerIndex, Def->GetPrimaryAssetId(), Quantity, OutAdded, OutInstanceId);
+	FInvContainer& Cont = Containers[ContainerIndex];
+	const FGameplayTag ItemType = Def->GetItemType();
+	const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
+	const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
+
+	int32 Added = 0;
+	FGuid UsedInstance;
+	const int32 LastIndex = Cont.AddOrStack(Def->GetPrimaryAssetId(), ItemType, MaxStack, Quantity, UsedInstance, Added);
+	OutAdded = Added;
+	OutInstanceId = UsedInstance;
+
+	// If a new stack was created, copy runtime data from the world item component into the new entry
+	if (LastIndex != INDEX_NONE)
+	{
+		FInv_InventoryEntry* NewEntry = Cont.FindEntryMutableByInstance(UsedInstance);
+		if (NewEntry)
+		{
+			NewEntry->CopyRuntimeDataFrom(ItemComponent->GetRuntimeData());
+			// Ensure the stack count matches what the container decided for the new stack
+			NewEntry->SetStack(NewEntry->GetStack());
+		}
+	}
+	return LastIndex != INDEX_NONE || Added > 0;
 }
 
 bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)

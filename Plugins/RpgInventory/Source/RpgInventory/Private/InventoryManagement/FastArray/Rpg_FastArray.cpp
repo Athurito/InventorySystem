@@ -64,6 +64,18 @@ int32 FInvContainer::FindIndexByInstance(const FGuid& InstanceId) const
 	return INDEX_NONE;
 }
 
+FInv_InventoryEntry* FInvContainer::FindEntryMutableByInstance(const FGuid& InstanceId)
+{
+	for (int32 i = 0; i < Entries.Num(); ++i)
+	{
+		if (Entries[i].GetInstanceId() == InstanceId)
+		{
+			return &Entries[i];
+		}
+	}
+	return nullptr;
+}
+
 int32 FInvContainer::AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded)
 {
 	OutAdded = 0;

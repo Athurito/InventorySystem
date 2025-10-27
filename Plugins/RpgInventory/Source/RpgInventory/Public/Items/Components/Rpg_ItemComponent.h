@@ -41,6 +41,7 @@ public:
 	// Runtime stack access via RuntimeData (single source of truth)
 	int32 GetCurrentStackCount() const;
 	int32 GetMaxStackSize() const;
+	const FItemRuntimeDataContainer& GetRuntimeData() const { return RuntimeData; }
 
 	// Attempts to consume this item according to its Consumable Fragment rules
 	bool Consume(APawn* Instigator);
