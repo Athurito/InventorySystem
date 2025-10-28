@@ -116,7 +116,7 @@ bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, co
 	if (!Cons) return false;
 
 	APawn* InstigatorPawn = ResolveInstigator(nullptr);
-	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::Inventory)) return false;
+	if (!(Cons && Cons->AllowsContext(EUseContext::Inventory))) return false;
 
 	// If an ability is defined on the fragment, prefer activating it and let it handle costs/cooldowns/effects.
 	if (Cons->AbilityClass)
@@ -130,30 +130,22 @@ bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, co
 		return bActivated;
 	}
 
-	// Fallback legacy path (no ability specified): manual cooldown/effect/costs
+ // Fallback legacy path (no ability specified): manual cooldown/effect/costs
 	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
 
-	// Cooldown
-	if (Cons->CooldownSeconds > 0.f)
-	{
-		const float Now = GetWorld()->GetTimeSeconds();
-		if (!CheckAndSetCooldown(Entry->GetRuntimeDataMutable(), Def, Cons->CooldownSeconds, Now))
-		{
-			return false;
-		}
-	}
+
 
 	const int32 AvailStack = Entry->GetStack();
 	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
 	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
 	if (Uses <= 0) return false;
 
-	for (int32 i = 0; i < Uses; ++i)
+	if (!Cons->PreflightCanUse(Entry->GetRuntimeData(), Def))
 	{
-		ApplyUseByFragment(Def, InstigatorPawn);
+		return false;
 	}
 
-	ApplyCostsAndReplicate(Entry->GetRuntimeDataMutable(), Def, PerUse, Uses);
+	Cons->ReduceStackAfterUse(Entry->GetRuntimeDataMutable(), Def, Uses);
 
 	// Remove entry if depleted
 	if (Entry->GetStack() <= 0)
@@ -176,7 +168,7 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	if (!Cons) return false;
 
 	APawn* InstigatorPawn = ResolveInstigator(ItemComponent);
-	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::World)) return false;
+	if (!(Cons && Cons->AllowsContext(EUseContext::World))) return false;
 
 	// Ability-driven path: if AbilityClass is configured, activate once and let it handle everything.
 	if (Cons->AbilityClass)
@@ -191,16 +183,7 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 
 	// Fallback legacy path
 	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
-
-	// Cooldown
-	if (Cons->CooldownSeconds > 0.f)
-	{
-		const float Now = GetWorld()->GetTimeSeconds();
-		if (!CheckAndSetCooldown(const_cast<FItemRuntimeDataContainer&>(ItemComponent->GetRuntimeData()), Def, Cons->CooldownSeconds, Now))
-		{
-			return false;
-		}
-	}
+	
 
 	const int32 AvailStack = ItemComponent->GetCurrentStackCount();
 	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
@@ -221,29 +204,6 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	return true;
 }
 
-bool URpg_ContainerComponent::CanUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator, EUseContext Ctx)
-{
-	const FConsumableFragment* Cons = GetConsumable(Def);
-	if (!Cons) return false;
-
-	switch (Cons->UseAvailability)
-	{
-		case EUseAvailability::WorldOnly: if (Ctx != EUseContext::World) return false; break;
-		case EUseAvailability::InventoryOnly: if (Ctx == EUseContext::World) return false; break;
-		case EUseAvailability::WorldOrInventory: break;
-		case EUseAvailability::PickupThenUseIfWorld: if (Ctx == EUseContext::World) return false; break;
-	}
-	// Extend with BP checks later
-	return true;
-}
-
-void URpg_ContainerComponent::ApplyUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator)
-{
-	// Currently effects are applied in URpg_ItemComponent::Consume for world items.
-	// For inventory usage without a world component, you could mirror that logic here if needed.
-	// No-op for now.
-}
-
 bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply)
 {
 	bool bChanged = false;
@@ -259,22 +219,6 @@ bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& 
 		}
 	}
 	return bChanged;
-}
-
-bool URpg_ContainerComponent::CheckAndSetCooldown(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, float CooldownSeconds, float ServerTimeNow)
-{
-	if (CooldownSeconds <= 0.f) return true;
-	if (auto* C = Runtime.FindOrAddMutable<FUseCooldownRuntimeData>(FragmentTags::ConsumableFragment))
-	{
-		if (ServerTimeNow - C->LastUseServerTime < CooldownSeconds)
-		{
-			return false;
-		}
-		C->LastUseServerTime = ServerTimeNow;
-		Runtime.MarkDirty(FragmentTags::ConsumableFragment);
-		return true;
-	}
-	return false;
 }
 
 void URpg_ContainerComponent::BeginPlay()

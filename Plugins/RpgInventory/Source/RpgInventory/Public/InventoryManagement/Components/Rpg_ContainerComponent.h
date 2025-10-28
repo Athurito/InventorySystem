@@ -105,10 +105,8 @@ protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
 	bool InternalUseItem_Inventory(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	bool InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity);
-	static bool CanUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator, EUseContext Ctx);
-	static void ApplyUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator);
+	
 	static bool ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply);
-	static bool CheckAndSetCooldown(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, float CooldownSeconds, float ServerTimeNow);
 
 	virtual void BeginPlay() override;
 private:

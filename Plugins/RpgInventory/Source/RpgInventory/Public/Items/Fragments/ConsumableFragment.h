@@ -10,6 +10,8 @@
 
 class UGameplayEffect;
 class UGameplayAbility;
+struct FItemRuntimeDataContainer;
+class URpg_ItemDefinition;
 
 UENUM(BlueprintType)
 enum class EUseContext : uint8 { World, Inventory, Hotbar };
@@ -73,8 +75,9 @@ struct FConsumableFragment : public FItemFragment
 	// After picking up in world, automatically use (only relevant with PickupThenUseIfWorld policy)
 	UPROPERTY(EditAnywhere, Category = "Consumable|Flow")
 	bool bAutoUseAfterPickup = false;
-
-	// Optional per-instance cooldown (deprecated when using Ability with Cooldown)
-	UPROPERTY(EditAnywhere, Category = "Consumable|Cooldown", meta=(ClampMin="0.0"))
-	float CooldownSeconds = 0.f;
+	
+	// Fragment-centric helper methods (C++)
+	bool AllowsContext(EUseContext Ctx) const;
+	bool PreflightCanUse(const FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def) const;
+	bool ReduceStackAfterUse(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 Uses) const;
 };
