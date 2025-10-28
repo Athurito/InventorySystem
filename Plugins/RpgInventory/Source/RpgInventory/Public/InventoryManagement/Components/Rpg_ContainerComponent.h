@@ -4,10 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayTagContainer.h"
 #include "InventoryManagement/FastArray/Rpg_FastArray.h"
 #include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
 
+
+// Forward declarations to avoid heavy includes
+enum class EInventorySlotType : uint8;
+class UInventoryContainerDefinition;
 
 USTRUCT(BlueprintType)
 struct FInvContainerEntry
@@ -18,6 +23,8 @@ struct FInvContainerEntry
 };
 
 class URpg_ItemComponent;
+class UInventoryContainerDefinition;
+class UInventoryContainerDefinition;
 
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_ItemComponent*, ItemComponent, int32, QuantityUsed);

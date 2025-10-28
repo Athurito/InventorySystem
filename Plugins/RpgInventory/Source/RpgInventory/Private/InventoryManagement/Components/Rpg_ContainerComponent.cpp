@@ -21,6 +21,7 @@ URpg_ContainerComponent::URpg_ContainerComponent()
 	SetIsReplicatedByDefault(true);
 }
 
+
 void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

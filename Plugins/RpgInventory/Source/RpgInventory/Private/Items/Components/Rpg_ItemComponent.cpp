@@ -11,6 +11,7 @@
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
 #include "InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "InventoryManagement/Utils/InventoryStatics.h"
 #include "Items/Fragments/ConsumableFragment.h"
 #include "Items/Fragments/StackableFragment.h"
 #include "Items/Runtime/ItemRuntimeData.h"
@@ -257,86 +258,95 @@ bool URpg_ItemComponent::CanInteract_Implementation(APawn* Instigator) const
 void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 {
 	URpg_ContainerComponent* InventoryComponent = nullptr;
-
-	if (Instigator)
+	
+	InventoryComponent = UInventoryStatics::ResolveInventoryFromInstigator(Instigator);
+	
+	if (!InventoryComponent)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Interact: Instigator is valid"));
-		
-		if (AController* Controller = Instigator->GetController())
+		UE_LOG(LogTemp, Error, TEXT("Interact: NO InventoryComponent found anywhere!"));
+		return;
+	}
+	
+	const URpg_ItemDefinition* Def = GetItemDefinition();
+	if (!Def)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Interact: No ItemDefinition, aborting"));
+		return;
+	}
+
+	// 1) If item is consumable, consume it via container rules
+	if (const FConsumableFragment* ConsumableFragment = Def->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
+	{
+		InventoryComponent->TryConsumeItem(this, FMath::Max(1, ConsumableFragment->QuantityPerUse));
+		return;
+	}
+
+	// 2) Otherwise: attempt to pick up into an appropriate container
+	const FGameplayTag ItemType = Def->GetItemType();
+	int32 TargetContainerIdx = INDEX_NONE;
+	// Find first container that allows this item type
+	for (int32 i = 0; i < InventoryComponent->Containers.Num(); ++i)
+	{
+		if (InventoryComponent->Containers[i].IsItemAllowed(ItemType))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Interact: Controller is valid"));
-			
-			// Prefer Inventory on Controller
-			InventoryComponent = Controller->FindComponentByClass<URpg_ContainerComponent>();
-			if (InventoryComponent)
+			TargetContainerIdx = i;
+			break;
+		}
+	}
+	if (TargetContainerIdx == INDEX_NONE)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Interact: No accepting container for item type %s"), *ItemType.ToString());
+		return;
+	}
+
+	// Determine quantity to pick up
+	int32 QuantityToAdd = 1;
+	if (Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+	{
+		QuantityToAdd = FMath::Max(1, GetCurrentStackCount());
+	}
+
+	int32 OutAdded = 0; FGuid OutInstanceId;
+	const bool bRequested = InventoryComponent->AddItemToContainer(TargetContainerIdx, this, QuantityToAdd, OutAdded, OutInstanceId);
+
+	// If we are on the server, reduce or destroy the world item based on how much was actually added
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		if (OutAdded > 0)
+		{
+			if (FStackableRuntimeData* StackData = RuntimeData.FindMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Controller"));
-			}
-			
-			// Fallback to PlayerState (survives level changes)
-			if (!InventoryComponent && Controller->PlayerState)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Interact: PlayerState is valid, searching for component..."));
-				InventoryComponent = Controller->PlayerState->FindComponentByClass<URpg_ContainerComponent>();
-				
-				if (InventoryComponent)
+				StackData->CurrentStackCount = FMath::Max(0, StackData->CurrentStackCount - OutAdded);
+				RuntimeData.MarkDirty(FragmentTags::StackableFragment);
+				if (StackData->CurrentStackCount <= 0)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on PlayerState!"));
-				}
-				else
-				{
-					UE_LOG(LogTemp, Error, TEXT("Interact: PlayerState exists but NO InventoryComponent found!"));
+					if (AActor* OwnerActor = GetOwner())
+					{
+						OwnerActor->Destroy();
+					}
 				}
 			}
-			else if (!Controller->PlayerState)
+			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Interact: PlayerState is NULL!"));
+				// Non-stackable or no stack runtime data: if anything was added, just destroy the actor
+				if (Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment) == nullptr)
+				{
+					if (AActor* OwnerActor = GetOwner())
+					{
+						OwnerActor->Destroy();
+					}
+				}
 			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("Interact: Controller is NULL!"));
-		}
-		
-		// As last resort, try on Pawn itself
-		if (!InventoryComponent)
-		{
-			InventoryComponent = Instigator->FindComponentByClass<URpg_ContainerComponent>();
-			if (InventoryComponent)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Pawn"));
-			}
+			UE_LOG(LogTemp, Warning, TEXT("Interact: AddItemToContainer added nothing (full or disallowed)"));
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Interact: Instigator is NULL!"));
-	}
-	
-	// Final fallback: try owner of this component
-	if (!InventoryComponent)
-	{
-		if (AActor* OwnerActor = GetOwner())
-		{
-			InventoryComponent = OwnerActor->FindComponentByClass<URpg_ContainerComponent>();
-			if (InventoryComponent)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Interact: Found InventoryComponent on Owner"));
-			}
-		}
-	}
-
-	if (InventoryComponent)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Interact: Successfully found InventoryComponent, attempting to consume"));
-		if (const FConsumableFragment* ConsumableFragment = GetItemDefinition()->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
-		{
-			InventoryComponent->TryConsumeItem(this, ConsumableFragment->QuantityPerUse);
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Interact: NO InventoryComponent found anywhere!"));
+		// On clients we just requested via RPC; the server will replicate inventory and possibly destroy the world item.
+		UE_LOG(LogTemp, Verbose, TEXT("Interact: Pickup requested (client), waiting for replication"));
 	}
 }
 

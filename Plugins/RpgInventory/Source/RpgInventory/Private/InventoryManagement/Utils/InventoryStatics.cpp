@@ -4,6 +4,7 @@
 #include "InventoryManagement/Utils/InventoryStatics.h"
 
 #include "Engine/AssetManager.h"
+#include "GameFramework/PlayerState.h"
 #include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
 
@@ -31,6 +32,31 @@ URpg_ContainerComponent* UInventoryStatics::GetContainerComponent(AActor* Owner)
 	}
 
 	return Owner->FindComponentByClass<URpg_ContainerComponent>();
+}
+
+URpg_ContainerComponent* UInventoryStatics::ResolveInventoryFromInstigator(APawn* Instigator)
+{
+	if (!IsValid(Instigator))
+		return nullptr;
+	
+	if (APlayerState* PS = Instigator->GetPlayerState())
+	{
+		if (URpg_ContainerComponent* C = PS->FindComponentByClass<URpg_ContainerComponent>())
+			return C;
+	}
+	
+	if (AController* Controller = Instigator->GetController())
+	{
+		if (URpg_ContainerComponent* C = Controller->FindComponentByClass<URpg_ContainerComponent>())
+			return C;
+	}
+
+	if (URpg_ContainerComponent* C = Instigator->FindComponentByClass<URpg_ContainerComponent>())
+	{
+		return C;
+	}
+	
+	return nullptr;
 }
 
 

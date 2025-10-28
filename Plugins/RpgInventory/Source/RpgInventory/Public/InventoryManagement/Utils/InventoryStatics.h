@@ -21,4 +21,5 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	static URpg_ItemDefinition* GetItemDefinitionById(const FPrimaryAssetId& ItemId);
 	static URpg_ContainerComponent* GetContainerComponent(AActor* Owner);
+	static URpg_ContainerComponent* ResolveInventoryFromInstigator(APawn* Instigator);
 };
