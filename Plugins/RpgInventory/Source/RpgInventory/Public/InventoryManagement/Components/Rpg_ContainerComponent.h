@@ -14,6 +14,8 @@
 enum class EInventorySlotType : uint8;
 enum class EUseContext : uint8;
 class UInventoryContainerDefinition;
+class UAbilitySystemComponent;
+struct FConsumableFragment;
 
 USTRUCT(BlueprintType)
 struct FInvContainerEntry
@@ -111,6 +113,9 @@ protected:
 	virtual void BeginPlay() override;
 private:
 	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
+	// Activate the consumable ability defined on the fragment, passing SourceObject context
+	bool ActivateConsumableAbility(const struct FConsumableFragment* Cons, APawn* InstigatorPawn, UObject* SourceObject) const;
+	
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);

@@ -14,6 +14,10 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/AssetManager.h"
 #include "InventoryManagement/Utils/InventoryStatics.h"
+#include "InventoryManagement/Use/ItemUseSource_Inventory.h"
+#include "AbilitySystemInterface.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayAbilitySpec.h"
 
 URpg_ContainerComponent::URpg_ContainerComponent()
 {
@@ -114,6 +118,19 @@ bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, co
 	APawn* InstigatorPawn = ResolveInstigator(nullptr);
 	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::Inventory)) return false;
 
+	// If an ability is defined on the fragment, prefer activating it and let it handle costs/cooldowns/effects.
+	if (Cons->AbilityClass)
+	{
+		UObject* SourceObj = UItemUseSource_Inventory::Make(this, this, ContainerIndex, InstanceId);
+		const bool bActivated = ActivateConsumableAbility(Cons, InstigatorPawn, SourceObj);
+		if (bActivated)
+		{
+			OnItemConsumed.Broadcast(nullptr, Quantity);
+		}
+		return bActivated;
+	}
+
+	// Fallback legacy path (no ability specified): manual cooldown/effect/costs
 	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
 
 	// Cooldown
@@ -161,6 +178,18 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	APawn* InstigatorPawn = ResolveInstigator(ItemComponent);
 	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::World)) return false;
 
+	// Ability-driven path: if AbilityClass is configured, activate once and let it handle everything.
+	if (Cons->AbilityClass)
+	{
+		const bool bActivated = ActivateConsumableAbility(Cons, InstigatorPawn, ItemComponent);
+		if (bActivated)
+		{
+			OnItemConsumed.Broadcast(ItemComponent, Quantity);
+		}
+		return bActivated;
+	}
+
+	// Fallback legacy path
 	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
 
 	// Cooldown
@@ -291,12 +320,24 @@ APawn* URpg_ContainerComponent::ResolveInstigator(const URpg_ItemComponent* Item
 		}
 	}
 	
-	if (!InstigatorPawn)
+	if (!InstigatorPawn && ItemComponent)
 	{
 		// Fallback: try the item's owner as instigator pawn
 		InstigatorPawn = Cast<APawn>(ItemComponent->GetOwner());
 	}
 	return InstigatorPawn;
+}
+
+bool URpg_ContainerComponent::ActivateConsumableAbility(const FConsumableFragment* Cons, APawn* InstigatorPawn, UObject* SourceObject) const
+{
+	if (!Cons || !Cons->AbilityClass) return false;
+	UAbilitySystemComponent* ASC = UInventoryStatics::ResolveASCFromPawn(InstigatorPawn);
+	if (!ASC) return false;
+
+	FGameplayAbilitySpec Spec(Cons->AbilityClass, /*Level*/1, /*InputID*/INDEX_NONE, SourceObject);
+	// Optionally, CooldownEffect can be applied inside the Ability; we do not apply it here to keep editor-driven setup.
+	FGameplayAbilitySpecHandle Handle = ASC->GiveAbilityAndActivateOnce(Spec);
+	return Handle.IsValid();
 }
 
 

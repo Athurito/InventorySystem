@@ -3,6 +3,7 @@
 
 #include "InventoryManagement/Utils/InventoryStatics.h"
 
+#include "AbilitySystemInterface.h"
 #include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
 #include "InventoryManagement/Components/Rpg_ContainerComponent.h"
@@ -59,4 +60,29 @@ URpg_ContainerComponent* UInventoryStatics::ResolveInventoryFromInstigator(APawn
 	return nullptr;
 }
 
-
+UAbilitySystemComponent* UInventoryStatics::ResolveASCFromPawn(APawn* InstigatorPawn)
+{
+	if (!InstigatorPawn) return nullptr;
+	// Pawn implements ASI
+	if (const IAbilitySystemInterface* ASIInst = Cast<IAbilitySystemInterface>(InstigatorPawn))
+	{
+		if (UAbilitySystemComponent* C = ASIInst->GetAbilitySystemComponent()) return C;
+	}
+	// PlayerState usually holds ASC
+	if (APlayerState* PS = InstigatorPawn->GetPlayerState())
+	{
+		if (const IAbilitySystemInterface* ASIPS = Cast<IAbilitySystemInterface>(PS))
+		{
+			if (UAbilitySystemComponent* C = ASIPS->GetAbilitySystemComponent()) return C;
+		}
+	}
+	// Controller may also implement
+	if (AController* Cntr = InstigatorPawn->GetController())
+	{
+		if (const IAbilitySystemInterface* ASIC = Cast<IAbilitySystemInterface>(Cntr))
+		{
+			if (UAbilitySystemComponent* C = ASIC->GetAbilitySystemComponent()) return C;
+		}
+	}
+	return nullptr;
+}

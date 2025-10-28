@@ -9,6 +9,7 @@
 #include "ConsumableFragment.generated.h"
 
 class UGameplayEffect;
+class UGameplayAbility;
 
 UENUM(BlueprintType)
 enum class EUseContext : uint8 { World, Inventory, Hotbar };
@@ -37,7 +38,15 @@ struct FConsumableFragment : public FItemFragment
 	UPROPERTY(EditAnywhere, Category = "Consumable|Use")
 	EUseAvailability UseAvailability = EUseAvailability::WorldOrInventory;
 
-	// Gameplay Effect to apply when consumed
+	// Ability to activate when using this item (defined in editor on the fragment)
+	UPROPERTY(EditAnywhere, Category = "Consumable|Ability")
+	TSubclassOf<UGameplayAbility> AbilityClass;
+
+	// Optional cooldown GameplayEffect to apply when used (can also be configured inside the Ability)
+	UPROPERTY(EditAnywhere, Category = "Consumable|Ability")
+	TSubclassOf<UGameplayEffect> CooldownEffect;
+
+	// Gameplay Effect to apply when consumed (legacy/fallback if no Ability is set)
 	UPROPERTY(EditAnywhere, Category = "Consumable|Effect")
 	TSubclassOf<UGameplayEffect> ConsumableEffect;
 
@@ -65,7 +74,7 @@ struct FConsumableFragment : public FItemFragment
 	UPROPERTY(EditAnywhere, Category = "Consumable|Flow")
 	bool bAutoUseAfterPickup = false;
 
-	// Optional per-instance cooldown
+	// Optional per-instance cooldown (deprecated when using Ability with Cooldown)
 	UPROPERTY(EditAnywhere, Category = "Consumable|Cooldown", meta=(ClampMin="0.0"))
 	float CooldownSeconds = 0.f;
 };

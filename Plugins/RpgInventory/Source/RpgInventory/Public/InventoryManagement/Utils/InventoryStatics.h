@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "InventoryStatics.generated.h"
 
+class UAbilitySystemComponent;
 class URpg_ContainerComponent;
 class URpg_ItemDefinition;
 /**
@@ -22,4 +24,5 @@ public:
 	static URpg_ItemDefinition* GetItemDefinitionById(const FPrimaryAssetId& ItemId);
 	static URpg_ContainerComponent* GetContainerComponent(AActor* Owner);
 	static URpg_ContainerComponent* ResolveInventoryFromInstigator(APawn* Instigator);
+	static UAbilitySystemComponent* ResolveASCFromPawn(APawn* InstigatorPawn);
 };
