@@ -31,19 +31,33 @@ void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 
 void URpg_ContainerComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
-	if (!ItemComponent || Quantity <= 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("TryConsumeItem: Invalid args (Item=%p, Qty=%d)"), ItemComponent, Quantity);
-		return;
-	}
+	// Backward compatibility: route to unified world-use path
+	TryUseWorldItem(ItemComponent, Quantity);
+}
 
+void URpg_ContainerComponent::TryUseItemByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity)
+{
+	if (Quantity <= 0) return;
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		InternalConsume(ItemComponent, Quantity);
+		InternalUseItem_Inventory(ContainerIndex, InstanceId, Quantity);
 	}
 	else
 	{
-		ServerConsumeItem(ItemComponent, Quantity);
+		ServerUseItemByInstance(ContainerIndex, InstanceId, Quantity);
+	}
+}
+
+void URpg_ContainerComponent::TryUseWorldItem(URpg_ItemComponent* ItemComponent, int32 Quantity)
+{
+	if (!ItemComponent || Quantity <= 0) return;
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		InternalUseItem_World(ItemComponent, Quantity);
+	}
+	else
+	{
+		ServerUseWorldItem(ItemComponent, Quantity);
 	}
 }
 
@@ -58,52 +72,180 @@ void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 void URpg_ContainerComponent::ServerConsumeItem_Implementation(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
 	if (!ItemComponent || !IsValid(ItemComponent) || !IsValid(ItemComponent->GetOwner())) return;
-	InternalConsume(ItemComponent, Quantity);
+	// Route to unified world-use path
+	ServerUseWorldItem(ItemComponent, Quantity);
 }
 
 bool URpg_ContainerComponent::InternalConsume(URpg_ItemComponent* ItemComponent, int32 const Quantity) const
 {
-	ensure(GetOwner() && GetOwner()->HasAuthority());
-	
-	if (!ensure(ItemComponent))
+	// Legacy path kept for compatibility; route into unified world use
+	URpg_ContainerComponent* MutableThis = const_cast<URpg_ContainerComponent*>(this);
+	return MutableThis->InternalUseItem_World(ItemComponent, Quantity);
+}
+
+void URpg_ContainerComponent::ServerUseItemByInstance_Implementation(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity)
+{
+	InternalUseItem_Inventory(ContainerIndex, InstanceId, Quantity);
+}
+
+void URpg_ContainerComponent::ServerUseWorldItem_Implementation(URpg_ItemComponent* ItemComponent, int32 Quantity)
+{
+	InternalUseItem_World(ItemComponent, Quantity);
+}
+
+static const FConsumableFragment* GetConsumable(const URpg_ItemDefinition* Def)
+{
+	return Def ? Def->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment) : nullptr;
+}
+
+bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity)
+{
+	if (!(GetOwner() && GetOwner()->HasAuthority())) return false;
+	if (Quantity <= 0) return false;
+	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+
+	FInv_InventoryEntry* Entry = Containers[ContainerIndex].FindEntryMutableByInstance(InstanceId);
+	if (!Entry) return false;
+	URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(Entry->GetItemId());
+	if (!Def) return false;
+	const FConsumableFragment* Cons = GetConsumable(Def);
+	if (!Cons) return false;
+
+	APawn* InstigatorPawn = ResolveInstigator(nullptr);
+	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::Inventory)) return false;
+
+	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
+
+	// Cooldown
+	if (Cons->CooldownSeconds > 0.f)
 	{
-		return false;
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (!CheckAndSetCooldown(Entry->GetRuntimeDataMutable(), Def, Cons->CooldownSeconds, Now))
+		{
+			return false;
+		}
 	}
 
-	const URpg_ItemDefinition* ItemDefinition = ItemComponent->GetItemDefinition();
-	if (!ItemDefinition)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("InternalConsume: ItemData is null"));
-		return false;
-	}
-	
-	const FConsumableFragment* Consumable = ItemDefinition->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment);
-	if (!Consumable)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("InternalConsume: Item not consumable"));
-		return false;
-	}
-
-	const int32 PerUse = FMath::Max(1, Consumable->QuantityPerUse);
-	const int32 Avail = ItemComponent->GetCurrentStackCount();
-	const int32 MaxUses = Consumable->bReduceStack ? (Avail / PerUse) : Quantity;
+	const int32 AvailStack = Entry->GetStack();
+	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
 	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
-
 	if (Uses <= 0) return false;
-	
+
 	for (int32 i = 0; i < Uses; ++i)
 	{
-		ItemComponent->Consume(ResolveInstigator(ItemComponent)); // verringert serverseitig Stack
+		ApplyUseByFragment(Def, InstigatorPawn);
 	}
 
-	OnItemConsumed.Broadcast(ItemComponent, Uses);
+	ApplyCostsAndReplicate(Entry->GetRuntimeDataMutable(), Def, PerUse, Uses);
 
-	// Dropped-Item: bei 0 Stack → Owner zerstören (in ItemComponent::Consume oder hier)
+	// Remove entry if depleted
+	if (Entry->GetStack() <= 0)
+	{
+		int32 Removed = 0;
+		Containers[ContainerIndex].RemoveByInstance(InstanceId, 0, Removed);
+	}
+
+	OnItemConsumed.Broadcast(nullptr, Uses);
+	return true;
+}
+
+bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity)
+{
+	if (!(GetOwner() && GetOwner()->HasAuthority())) return false;
+	if (!ItemComponent || Quantity <= 0) return false;
+	const URpg_ItemDefinition* Def = ItemComponent->GetItemDefinition();
+	if (!Def) return false;
+	const FConsumableFragment* Cons = GetConsumable(Def);
+	if (!Cons) return false;
+
+	APawn* InstigatorPawn = ResolveInstigator(ItemComponent);
+	if (!CanUseByFragment(Def, InstigatorPawn, EUseContext::World)) return false;
+
+	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
+
+	// Cooldown
+	if (Cons->CooldownSeconds > 0.f)
+	{
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (!CheckAndSetCooldown(const_cast<FItemRuntimeDataContainer&>(ItemComponent->GetRuntimeData()), Def, Cons->CooldownSeconds, Now))
+		{
+			return false;
+		}
+	}
+
+	const int32 AvailStack = ItemComponent->GetCurrentStackCount();
+	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
+	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
+	if (Uses <= 0) return false;
+
+	for (int32 i = 0; i < Uses; ++i)
+	{
+		ItemComponent->Consume(InstigatorPawn);
+	}
+
 	if (ItemComponent->GetCurrentStackCount() <= 0)
 	{
 		if (AActor* Owner = ItemComponent->GetOwner()) Owner->Destroy();
 	}
+
+	OnItemConsumed.Broadcast(ItemComponent, Uses);
 	return true;
+}
+
+bool URpg_ContainerComponent::CanUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator, EUseContext Ctx)
+{
+	const FConsumableFragment* Cons = GetConsumable(Def);
+	if (!Cons) return false;
+
+	switch (Cons->UseAvailability)
+	{
+		case EUseAvailability::WorldOnly: if (Ctx != EUseContext::World) return false; break;
+		case EUseAvailability::InventoryOnly: if (Ctx == EUseContext::World) return false; break;
+		case EUseAvailability::WorldOrInventory: break;
+		case EUseAvailability::PickupThenUseIfWorld: if (Ctx == EUseContext::World) return false; break;
+	}
+	// Extend with BP checks later
+	return true;
+}
+
+void URpg_ContainerComponent::ApplyUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator)
+{
+	// Currently effects are applied in URpg_ItemComponent::Consume for world items.
+	// For inventory usage without a world component, you could mirror that logic here if needed.
+	// No-op for now.
+}
+
+bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply)
+{
+	bool bChanged = false;
+	if (const FStackableFragment* Stackable = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
+	{
+		if (auto* S = Runtime.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
+		{
+			const int32 Max = FMath::Max(1, Stackable->GetMaxStackSize());
+			const int32 Cost = QuantityPerUse * UsesToApply;
+			S->CurrentStackCount = FMath::Clamp(S->CurrentStackCount - Cost, 0, Max);
+			Runtime.MarkDirty(FragmentTags::StackableFragment);
+			bChanged = true;
+		}
+	}
+	return bChanged;
+}
+
+bool URpg_ContainerComponent::CheckAndSetCooldown(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, float CooldownSeconds, float ServerTimeNow)
+{
+	if (CooldownSeconds <= 0.f) return true;
+	if (auto* C = Runtime.FindOrAddMutable<FUseCooldownRuntimeData>(FragmentTags::ConsumableFragment))
+	{
+		if (ServerTimeNow - C->LastUseServerTime < CooldownSeconds)
+		{
+			return false;
+		}
+		C->LastUseServerTime = ServerTimeNow;
+		Runtime.MarkDirty(FragmentTags::ConsumableFragment);
+		return true;
+	}
+	return false;
 }
 
 void URpg_ContainerComponent::BeginPlay()

@@ -274,11 +274,28 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 		return;
 	}
 
-	// 1) If item is consumable, consume it via container rules
-	if (const FConsumableFragment* ConsumableFragment = Def->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
+	// 1) If item is consumable, respect policy
+	if (const FConsumableFragment* Cons = Def->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
 	{
-		InventoryComponent->TryConsumeItem(this, FMath::Max(1, ConsumableFragment->QuantityPerUse));
-		return;
+		switch (Cons->UseAvailability)
+		{
+			case EUseAvailability::WorldOnly:
+			case EUseAvailability::WorldOrInventory:
+			{
+				InventoryComponent->TryUseWorldItem(this, FMath::Max(1, Cons->QuantityPerUse));
+				return;
+			}
+			case EUseAvailability::InventoryOnly:
+			{
+				// Not usable directly in world; fall through to pickup
+				break;
+			}
+			case EUseAvailability::PickupThenUseIfWorld:
+			{
+				// We will pick up below; after successful pickup we may auto use
+				break;
+			}
+		}
 	}
 
 	// 2) Otherwise: attempt to pick up into an appropriate container

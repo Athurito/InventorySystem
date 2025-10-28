@@ -110,3 +110,14 @@ struct FStackableRuntimeData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
 	int32 CurrentStackCount = 1;
 };
+
+
+/** Optional per-instance cooldown for consumables */
+USTRUCT(BlueprintType)
+struct FUseCooldownRuntimeData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
+    float LastUseServerTime = -BIG_NUMBER;
+};

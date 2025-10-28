@@ -12,6 +12,7 @@
 
 // Forward declarations to avoid heavy includes
 enum class EInventorySlotType : uint8;
+enum class EUseContext : uint8;
 class UInventoryContainerDefinition;
 
 USTRUCT(BlueprintType)
@@ -25,6 +26,7 @@ struct FInvContainerEntry
 class URpg_ItemComponent;
 class UInventoryContainerDefinition;
 class UInventoryContainerDefinition;
+class URpg_ItemDefinition;
 
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_ItemComponent*, ItemComponent, int32, QuantityUsed);
@@ -74,9 +76,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
 	void TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity = 1);
 
+	// New unified Use API
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
+	void TryUseItemByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity = 1);
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
+	void TryUseWorldItem(URpg_ItemComponent* ItemComponent, int32 Quantity = 1);
+
 	// Server authoritative execution
 	UFUNCTION(Server, Reliable)
 	void ServerConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerUseItemByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
+	UFUNCTION(Server, Reliable)
+	void ServerUseWorldItem(URpg_ItemComponent* ItemComponent, int32 Quantity);
 	
 	
 	// Broadcast after successful consumption
@@ -89,6 +101,12 @@ public:
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
+	bool InternalUseItem_Inventory(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
+	bool InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity);
+	static bool CanUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator, EUseContext Ctx);
+	static void ApplyUseByFragment(const URpg_ItemDefinition* Def, APawn* Instigator);
+	static bool ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply);
+	static bool CheckAndSetCooldown(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, float CooldownSeconds, float ServerTimeNow);
 
 	virtual void BeginPlay() override;
 private:
