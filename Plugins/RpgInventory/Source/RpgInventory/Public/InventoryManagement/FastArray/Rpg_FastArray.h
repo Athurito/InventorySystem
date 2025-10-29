@@ -97,8 +97,8 @@ public:
 	// Auto-stack add; returns how many actually added and the (last) instance id used/created.
 	// If SourceRuntimeData is provided, it will be copied into any newly created stack (not applied to existing stacks).
  int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
-	// Remove quantity from an instance; removes entry when stack hits 0
-	bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
+    // Remove quantity from an instance; removes entry when stack hits 0
+    bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 private:
 	//Replicated list of items
 	UPROPERTY()

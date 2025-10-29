@@ -89,7 +89,6 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerUseWorldItem(URpg_ItemComponent* ItemComponent, int32 Quantity);
 	
-	
 	// Broadcast after successful consumption
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
 	FOnItemConsumedSignature OnItemConsumed;
@@ -112,4 +111,3 @@ private:
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	bool InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
 };
- 
