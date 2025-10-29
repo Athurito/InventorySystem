@@ -15,7 +15,10 @@ enum class EInventorySlotType : uint8;
 enum class EUseContext : uint8;
 class UInventoryContainerDefinition;
 class UAbilitySystemComponent;
+class APawn;
 struct FConsumableFragment;
+class URpg_ItemComponent;
+class URpg_ItemDefinition;
 
 USTRUCT(BlueprintType)
 struct FInvContainerEntry
@@ -24,12 +27,6 @@ struct FInvContainerEntry
 	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type = EInventorySlotType::Generic;
 	UPROPERTY(BlueprintReadOnly) int32 Index = INDEX_NONE; // Index im Containers-Array
 };
-
-class URpg_ItemComponent;
-class UInventoryContainerDefinition;
-class UInventoryContainerDefinition;
-class URpg_ItemDefinition;
-
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_ItemComponent*, ItemComponent, int32, QuantityUsed);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryItemChange, FInv_InventoryEntry, Item);
@@ -110,10 +107,6 @@ protected:
 
 	virtual void BeginPlay() override;
 private:
-	APawn* ResolveInstigator(const URpg_ItemComponent* ItemComponent) const;
-	// Activate the consumable ability defined on the fragment, passing SourceObject context
-	bool ActivateConsumableAbility(const struct FConsumableFragment* Cons, APawn* InstigatorPawn, UObject* SourceObject) const;
-	
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);

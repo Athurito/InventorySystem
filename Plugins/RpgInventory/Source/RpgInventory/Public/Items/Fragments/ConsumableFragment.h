@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ItemFragment.h"
 #include "Rpg_FragmentTags.h"
+#include "GameplayTagContainer.h"
 
 #include "ConsumableFragment.generated.h"
 
@@ -40,18 +41,10 @@ struct FConsumableFragment : public FItemFragment
 	UPROPERTY(EditAnywhere, Category = "Consumable|Use")
 	EUseAvailability UseAvailability = EUseAvailability::WorldOrInventory;
 
-	// Ability to activate when using this item (defined in editor on the fragment)
+	// Optional: Event tag to trigger an already granted ability via GameplayEvent (Blueprint/editor-driven)
 	UPROPERTY(EditAnywhere, Category = "Consumable|Ability")
-	TSubclassOf<UGameplayAbility> AbilityClass;
-
-	// Optional cooldown GameplayEffect to apply when used (can also be configured inside the Ability)
-	UPROPERTY(EditAnywhere, Category = "Consumable|Ability")
-	TSubclassOf<UGameplayEffect> CooldownEffect;
-
-	// Gameplay Effect to apply when consumed (legacy/fallback if no Ability is set)
-	UPROPERTY(EditAnywhere, Category = "Consumable|Effect")
-	TSubclassOf<UGameplayEffect> ConsumableEffect;
-
+	FGameplayTag UseEventTag;
+	
 	// Level used when applying the Gameplay Effect. Defaults to 1.0
 	UPROPERTY(EditAnywhere, Category = "Consumable|Effect")
 	float EffectLevel = 1.0f;

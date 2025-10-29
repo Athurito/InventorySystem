@@ -211,26 +211,6 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 		}
 		return nullptr;
 	};
-
-	// Apply gameplay effect if possible
-	if (Consumable->ConsumableEffect)
-	{
-		UAbilitySystemComponent* ASC = ResolveASC(Instigator, GetOwner());
-		if (ASC)
-		{
-			FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
-			FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(Consumable->ConsumableEffect, Consumable->EffectLevel, Ctx);
-			if (Spec.IsValid())
-			{
-				ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-			}
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Consume: No AbilitySystemComponent found to apply effect. Proceeding without effect."));
-		}
-	}
-
 	return true;
 }
 

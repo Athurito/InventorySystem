@@ -5,19 +5,16 @@
 
 
 #include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
 #include "Items/Components/Rpg_ItemComponent.h"
 #include "Items/Rpg_ItemDefinition.h"
 #include "Items/Fragments/ConsumableFragment.h"
 #include "Items/Fragments/StackableFragment.h"
 #include "Net/UnrealNetwork.h"
-#include "Engine/AssetManager.h"
 #include "InventoryManagement/Utils/InventoryStatics.h"
 #include "InventoryManagement/Use/ItemUseSource_Inventory.h"
-#include "AbilitySystemInterface.h"
-#include "AbilitySystemComponent.h"
-#include "GameplayAbilitySpec.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "Abilities/GameplayAbilityTypes.h"
 
 URpg_ContainerComponent::URpg_ContainerComponent()
 {
@@ -114,27 +111,25 @@ bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, co
 	if (!Def) return false;
 	const FConsumableFragment* Cons = GetConsumable(Def);
 	if (!Cons) return false;
-
-	APawn* InstigatorPawn = ResolveInstigator(nullptr);
+	
 	if (!(Cons && Cons->AllowsContext(EUseContext::Inventory))) return false;
 
-	// If an ability is defined on the fragment, prefer activating it and let it handle costs/cooldowns/effects.
-	if (Cons->AbilityClass)
+	// Preferred path: event-triggered ability if tag is set (editor/Blueprint-driven)
+	if (Cons->UseEventTag.IsValid())
 	{
+		FGameplayEventData EventData;
+		EventData.EventTag = Cons->UseEventTag;
+		EventData.Instigator = GetOwner();
+		EventData.EventMagnitude = Quantity;
 		UObject* SourceObj = UItemUseSource_Inventory::Make(this, this, ContainerIndex, InstanceId);
-		const bool bActivated = ActivateConsumableAbility(Cons, InstigatorPawn, SourceObj);
-		if (bActivated)
-		{
-			OnItemConsumed.Broadcast(nullptr, Quantity);
-		}
-		return bActivated;
+		EventData.OptionalObject = SourceObj;
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwner(), Cons->UseEventTag, EventData);
+		OnItemConsumed.Broadcast(nullptr, Quantity);
+		return true;
 	}
 
- // Fallback legacy path (no ability specified): manual cooldown/effect/costs
+	// Fallback legacy path (no ability specified): manual cooldown/effect/costs
 	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
-
-
-
 	const int32 AvailStack = Entry->GetStack();
 	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
 	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
@@ -166,42 +161,45 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	if (!Def) return false;
 	const FConsumableFragment* Cons = GetConsumable(Def);
 	if (!Cons) return false;
-
-	APawn* InstigatorPawn = ResolveInstigator(ItemComponent);
+	
 	if (!(Cons && Cons->AllowsContext(EUseContext::World))) return false;
 
-	// Ability-driven path: if AbilityClass is configured, activate once and let it handle everything.
-	if (Cons->AbilityClass)
+	// Preferred: event-triggered ability when UseEventTag is configured
+	if (Cons->UseEventTag.IsValid())
 	{
-		const bool bActivated = ActivateConsumableAbility(Cons, InstigatorPawn, ItemComponent);
-		if (bActivated)
-		{
-			OnItemConsumed.Broadcast(ItemComponent, Quantity);
-		}
-		return bActivated;
+		FGameplayEventData EventData;
+		EventData.EventTag = Cons->UseEventTag;
+		EventData.Instigator = GetOwner();
+		EventData.Target = ItemComponent->GetOwner();
+		EventData.EventMagnitude = Quantity;
+		EventData.OptionalObject = ItemComponent; // world item context
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwner(), Cons->UseEventTag, EventData);
+		OnItemConsumed.Broadcast(ItemComponent, Quantity);
+		return true;
 	}
 
-	// Fallback legacy path
-	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
-	
-
-	const int32 AvailStack = ItemComponent->GetCurrentStackCount();
-	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
-	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
-	if (Uses <= 0) return false;
-
-	for (int32 i = 0; i < Uses; ++i)
-	{
-		ItemComponent->Consume(InstigatorPawn);
-	}
-
-	if (ItemComponent->GetCurrentStackCount() <= 0)
-	{
-		if (AActor* Owner = ItemComponent->GetOwner()) Owner->Destroy();
-	}
-
-	OnItemConsumed.Broadcast(ItemComponent, Uses);
-	return true;
+	return false;
+	// // Fallback legacy path
+	// const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
+	//
+	//
+	// const int32 AvailStack = ItemComponent->GetCurrentStackCount();
+	// const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
+	// const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
+	// if (Uses <= 0) return false;
+	//
+	// for (int32 i = 0; i < Uses; ++i)
+	// {
+	// 	ItemComponent->Consume(InstigatorPawn);
+	// }
+	//
+	// if (ItemComponent->GetCurrentStackCount() <= 0)
+	// {
+	// 	if (AActor* Owner = ItemComponent->GetOwner()) Owner->Destroy();
+	// }
+	//
+	// OnItemConsumed.Broadcast(ItemComponent, Uses);
+	// return true;
 }
 
 bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply)
@@ -243,47 +241,6 @@ void URpg_ContainerComponent::BeginPlay()
 		Containers.Add(MoveTemp(C));
 	}
 }
-
-APawn* URpg_ContainerComponent::ResolveInstigator(const URpg_ItemComponent* ItemComponent) const
-{
-	APawn* InstigatorPawn = nullptr;
-	AActor* OwnerActor = GetOwner();
-	if (APawn* OwnerPawn = Cast<APawn>(OwnerActor))
-	{
-		InstigatorPawn = OwnerPawn;
-	}
-	else if (APlayerController* PC = Cast<APlayerController>(OwnerActor))
-	{
-		InstigatorPawn = PC->GetPawn();
-	}
-	else if (APlayerState* PS = Cast<APlayerState>(OwnerActor))
-	{
-		if (AController* C = PS->GetOwningController())
-		{
-			InstigatorPawn = C->GetPawn();
-		}
-	}
-	
-	if (!InstigatorPawn && ItemComponent)
-	{
-		// Fallback: try the item's owner as instigator pawn
-		InstigatorPawn = Cast<APawn>(ItemComponent->GetOwner());
-	}
-	return InstigatorPawn;
-}
-
-bool URpg_ContainerComponent::ActivateConsumableAbility(const FConsumableFragment* Cons, APawn* InstigatorPawn, UObject* SourceObject) const
-{
-	if (!Cons || !Cons->AbilityClass) return false;
-	UAbilitySystemComponent* ASC = UInventoryStatics::ResolveASCFromPawn(InstigatorPawn);
-	if (!ASC) return false;
-
-	FGameplayAbilitySpec Spec(Cons->AbilityClass, /*Level*/1, /*InputID*/INDEX_NONE, SourceObject);
-	// Optionally, CooldownEffect can be applied inside the Ability; we do not apply it here to keep editor-driven setup.
-	FGameplayAbilitySpecHandle Handle = ASC->GiveAbilityAndActivateOnce(Spec);
-	return Handle.IsValid();
-}
-
 
 bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
 {
