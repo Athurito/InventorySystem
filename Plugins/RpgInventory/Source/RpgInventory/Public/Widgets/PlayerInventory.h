@@ -1,0 +1,66 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "CommonUserWidget.h"
+#include "PlayerInventory.generated.h"
+
+class UCommonActivatableWidgetSwitcher;
+class UInventoryTabButton;
+class UTabList;
+class URpg_ContainerComponent;
+/**
+ * 
+ */
+struct FContainerRef { TWeakObjectPtr<URpg_ContainerComponent> Comp; int32 Index=-1; };
+UCLASS()
+class RPGINVENTORY_API UPlayerInventory : public UCommonUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	
+
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|UI")
+	URpg_ContainerComponent* GetPlayerContainerComponent() const { return PlayerContainerComponent.Get(); }
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|UI")
+	URpg_ContainerComponent* GetContextContainerComponent() const { return ContextContainerComponent.Get(); }
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|UI")
+	int32 GetContextContainerIndex() const { return ContextContainerIndex; }
+	
+private:
+	virtual void NativeOnInitialized() override;
+	void BuildPlayerTabsAndContent();
+	void EnsurePlayerComponent();
+	UFUNCTION()
+	void HandlePlayerTabSelected(FName TabId);
+	
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTabList> PlayerTabList = nullptr;
+	
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UCommonActivatableWidgetSwitcher> PlayerTabContentSwitcher = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
+	TSubclassOf<UInventoryTabButton> PlayerTabButtonClass = nullptr;
+
+	// Grid-Widget-Klasse (dein UContainerGrid)
+	UPROPERTY(EditDefaultsOnly, Category="Inventory")
+	TSubclassOf<UUserWidget> ContainerGridClass = nullptr; // e.g., UContainerGrid
+	
+	TWeakObjectPtr<URpg_ContainerComponent> PlayerContainerComponent;
+	TWeakObjectPtr<URpg_ContainerComponent> ContextContainerComponent;
+	
+	int32 ContextContainerIndex = INDEX_NONE;
+	
+	// Start-Tab (optional vom Aufrufer)
+	int32 RequestedStartTabIndex = 0;
+
+	// Mappings
+	TMap<FName, FContainerRef> TabMap;
+	TMap<FName, int32> TabToContentIndex; 
+};

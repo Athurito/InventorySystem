@@ -3,42 +3,12 @@
 
 #include "Widgets/InventoryShell.h"
 
+#include "CommonTabListWidgetBase.h"
 #include "Components/Overlay.h"
-#include "Widgets/Grid/ContainerGrid.h"
-#include "InventoryManagement/Components/Rpg_ContainerComponent.h"
-#include "InventoryManagement/Utils/InventoryStatics.h"
-
-void UInventoryShell::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-}
 
 void UInventoryShell::NativeOnActivated()
 {
 	Super::NativeOnActivated();
-	ApplyPlayerBinding();
-	ApplyContextWidget();
-}
-
-void UInventoryShell::InitializeShell(URpg_ContainerComponent* PlayerContainer, int32 InPlayerContainerIndex,
-	URpg_ContainerComponent* ContextContainer, int32 InContextContainerIndex, UWidget* ContextWidget)
-{
-	PlayerContainerComponent = PlayerContainer;
-	PlayerContainerIndex = InPlayerContainerIndex;
-	ContextContainerComponent = ContextContainer;
-	ContextContainerIndex = InContextContainerIndex;
-	ActiveContextWidget = ContextWidget;
-
-	ApplyPlayerBinding();
-	ApplyContextWidget();
-}
-
-void UInventoryShell::InitializeShellPlayerOnly(URpg_ContainerComponent* PlayerContainer, int32 InPlayerContainerIndex)
-{
-	PlayerContainerComponent = PlayerContainer;
-	PlayerContainerIndex = InPlayerContainerIndex;
-	ActiveContextWidget = nullptr; // Kontext später setzen
-	ApplyPlayerBinding();
 	ApplyContextWidget();
 }
 
@@ -48,35 +18,7 @@ void UInventoryShell::SetContextWidget(UWidget* InWidget)
 	ApplyContextWidget();
 }
 
-void UInventoryShell::ApplyPlayerBinding()
-{
-    // Auto-resolve the local player's container if not explicitly initialized
-    if (!PlayerContainerComponent.IsValid())
-    {
-        if (APlayerController* PC = GetOwningPlayer())
-        {
-            AActor* OwnerActor = PC->PlayerState ? static_cast<AActor*>(PC->PlayerState) : static_cast<AActor*>(PC);
-            if (OwnerActor)
-            {
-                if (URpg_ContainerComponent* AutoComp = UInventoryStatics::GetContainerComponent(OwnerActor))
-                {
-                    PlayerContainerComponent = AutoComp;
-                    if (PlayerContainerIndex == INDEX_NONE)
-                    {
-                        PlayerContainerIndex = 0;
-                    }
-                }
-            }
-        }
-    }
-
-    if (PlayerInventoryGrid && PlayerContainerComponent.IsValid())
-    {
-        PlayerInventoryGrid->BindToContainer(PlayerContainerComponent.Get(), PlayerContainerIndex);
-    }
-}
-
-void UInventoryShell::ApplyContextWidget()
+void UInventoryShell::ApplyContextWidget() const
 {
 	if (!DynamicContentRoot)
 	{

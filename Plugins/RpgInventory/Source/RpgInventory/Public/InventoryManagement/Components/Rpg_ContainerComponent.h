@@ -44,6 +44,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TArray<TSoftObjectPtr<UInventoryContainerDefinition>> InitialContainerDefs;
 
+	int32 GetContainerCount() const;
+	
 	// Runtime Container (Meta + FastArray)
 	UPROPERTY(Replicated) TArray<FInvContainer> Containers;
 
@@ -88,6 +90,9 @@ public:
 	void ServerUseItemByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
 	void ServerUseWorldItem(URpg_ItemComponent* ItemComponent, int32 Quantity);
+
+
+	UInventoryContainerDefinition* GetContainerDefinition(const int32 Index) const;
 	
 	// Broadcast after successful consumption
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")

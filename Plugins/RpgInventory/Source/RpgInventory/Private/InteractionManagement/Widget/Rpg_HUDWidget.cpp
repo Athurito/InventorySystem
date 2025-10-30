@@ -54,7 +54,7 @@ void URpg_HUDWidget::HideInteractPrompt()
 	}
 }
 
-void URpg_HUDWidget::PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass)
+void URpg_HUDWidget:: PushInventoryContextClass(TSubclassOf<UCommonActivatableWidget> WidgetClass)
 {
 	if (!InventoryStack || !WidgetClass)
 	{

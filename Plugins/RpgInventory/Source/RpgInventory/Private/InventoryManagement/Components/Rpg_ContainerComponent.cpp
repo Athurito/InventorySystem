@@ -22,13 +22,16 @@ URpg_ContainerComponent::URpg_ContainerComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-
 void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(URpg_ContainerComponent, Containers);
 }
 
+int32 URpg_ContainerComponent::GetContainerCount() const
+{
+	return InitialContainerDefs.Num();
+}
 
 void URpg_ContainerComponent::TryConsumeItem(URpg_ItemComponent* ItemComponent, const int32 Quantity)
 {
@@ -60,6 +63,15 @@ void URpg_ContainerComponent::TryUseWorldItem(URpg_ItemComponent* ItemComponent,
 	{
 		ServerUseWorldItem(ItemComponent, Quantity);
 	}
+}
+
+UInventoryContainerDefinition* URpg_ContainerComponent::GetContainerDefinition(const int32 Index) const
+{
+	if (!InitialContainerDefs.IsValidIndex(Index)) return nullptr;
+	
+	TSoftObjectPtr<UInventoryContainerDefinition> Def = InitialContainerDefs[Index];
+	
+	return Def.IsValid() ? Def.Get() : Def.LoadSynchronous();
 }
 
 void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
@@ -127,30 +139,7 @@ bool URpg_ContainerComponent::InternalUseItem_Inventory(int32 ContainerIndex, co
 		OnItemConsumed.Broadcast(nullptr, Quantity);
 		return true;
 	}
-
-	// Fallback legacy path (no ability specified): manual cooldown/effect/costs
-	const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
-	const int32 AvailStack = Entry->GetStack();
-	const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
-	const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
-	if (Uses <= 0) return false;
-
-	if (!Cons->PreflightCanUse(Entry->GetRuntimeData(), Def))
-	{
-		return false;
-	}
-
-	Cons->ReduceStackAfterUse(Entry->GetRuntimeDataMutable(), Def, Uses);
-
-	// Remove entry if depleted
-	if (Entry->GetStack() <= 0)
-	{
-		int32 Removed = 0;
-		Containers[ContainerIndex].RemoveByInstance(InstanceId, 0, Removed);
-	}
-
-	OnItemConsumed.Broadcast(nullptr, Uses);
-	return true;
+	return false;
 }
 
 bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity)
@@ -179,27 +168,6 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	}
 
 	return false;
-	// // Fallback legacy path
-	// const int32 PerUse = FMath::Max(1, Cons->QuantityPerUse);
-	//
-	//
-	// const int32 AvailStack = ItemComponent->GetCurrentStackCount();
-	// const int32 MaxUses = Cons->bReduceStack ? (AvailStack / PerUse) : Quantity;
-	// const int32 Uses = FMath::Clamp(Quantity, 0, MaxUses);
-	// if (Uses <= 0) return false;
-	//
-	// for (int32 i = 0; i < Uses; ++i)
-	// {
-	// 	ItemComponent->Consume(InstigatorPawn);
-	// }
-	//
-	// if (ItemComponent->GetCurrentStackCount() <= 0)
-	// {
-	// 	if (AActor* Owner = ItemComponent->GetOwner()) Owner->Destroy();
-	// }
-	//
-	// OnItemConsumed.Broadcast(ItemComponent, Uses);
-	// return true;
 }
 
 bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply)
