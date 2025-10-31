@@ -19,7 +19,6 @@ void UPlayerInventory::NativeOnInitialized()
 	{
 		PlayerTabList->OnTabSelected.RemoveAll(this);
 		PlayerTabList->OnTabSelected.AddDynamic(this, &UPlayerInventory::HandlePlayerTabSelected);
-		PlayerTabList->SetLinkedSwitcher(PlayerTabContentSwitcher);
 	}
 	
 	BuildPlayerTabsAndContent();
@@ -65,11 +64,23 @@ void UPlayerInventory::BuildPlayerTabsAndContent()
 		const FName TabId = *FString::Printf(TEXT("Player_%d"), i);
 		TabMap.Add(TabId, { PlayerContainerComponent, i });
 
-		// 2) Tab Button registrieren
+		// 2) Tab Button registrieren (ohne Content -> wir verwalten Switcher manuell)
 		const bool bOk = PlayerTabList->RegisterTab(TabId, PlayerTabButtonClass, /*ContentWidget*/ nullptr);
 		if (!bOk) continue;
 
-		// 3) Button betiteln
+		// 3) Grid erzeugen (ein Widget pro Tab) und binden
+		UContainerGrid* NewGridWidget = CreateWidget<UContainerGrid>(this, ContainerGridClass);
+		if (!NewGridWidget) continue;
+		NewGridWidget->BindToContainer(PlayerContainerComponent.Get(), i);
+		PlayerTabContentSwitcher->AddChild(NewGridWidget);
+		const int32 SwitcherIndex = PlayerTabContentSwitcher->GetChildIndex(NewGridWidget);
+		TabToContentIndex.Add(TabId, SwitcherIndex);
+		if (SwitcherIndex == INDEX_NONE)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UPlayerInventory: Failed to resolve switcher index for %s"), *TabId.ToString());
+		}
+
+		// 4) Button betiteln
 		if (UCommonButtonBase* RawBtn = PlayerTabList->GetTabButtonBaseByID(TabId))
 		{
 			if (auto* Btn = Cast<UInventoryTabButton>(RawBtn))
@@ -80,19 +91,6 @@ void UPlayerInventory::BuildPlayerTabsAndContent()
 				Btn->SetLabelAndIcon(Label, Def->TabIcon);
 			}
 		}
-
-		// 4) Grid erzeugen (ein Widget pro Tab)
-		UContainerGrid* NewGridWidget = CreateWidget<UContainerGrid>(this, ContainerGridClass);
-		if (!NewGridWidget) continue;
-
-		// Falls deine Gridklasse UContainerGrid ist:
-		if (UContainerGrid* Grid = Cast<UContainerGrid>(NewGridWidget))
-		{
-			Grid->BindToContainer(PlayerContainerComponent.Get(), i);
-		}
-
-		const int32 SwitcherIndex = PlayerTabContentSwitcher->AddChild(NewGridWidget)->GetLinkerIndex();
-		TabToContentIndex.Add(TabId, SwitcherIndex);
 	}
 
 	// Start-Tab wählen
@@ -130,7 +128,15 @@ void UPlayerInventory::HandlePlayerTabSelected(FName TabId)
 {
 	if (const FContainerRef* Ref = TabMap.Find(TabId))
 	{
-		PlayerContainerComponent = Ref->Comp;
-		EnsurePlayerComponent();
+		ContextContainerComponent = Ref->Comp;
+		ContextContainerIndex = Ref->Index;
+
+		if (const int32* ContentIdx = TabToContentIndex.Find(TabId))
+		{
+			if (PlayerTabContentSwitcher)
+			{
+				PlayerTabContentSwitcher->SetActiveWidgetIndex(*ContentIdx);
+			}
+		}
 	}
 }
