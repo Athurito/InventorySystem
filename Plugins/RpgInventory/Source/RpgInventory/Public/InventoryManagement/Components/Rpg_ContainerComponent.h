@@ -9,6 +9,26 @@
 #include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
 
+USTRUCT(BlueprintType)
+struct FInventoryDragPayload
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	TWeakObjectPtr<class URpg_ContainerComponent> SourceComponent;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 SourceContainerIndex = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 SourceSlotIndex = INDEX_NONE;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FGuid InstanceId;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 Quantity = 0; // 0 or less means all
+};
 
 // Forward declarations to avoid heavy includes
 enum class EInventorySlotType : uint8;
@@ -51,6 +71,14 @@ public:
 	// Runtime Container (Meta + FastArray)
 	UPROPERTY(ReplicatedUsing=OnRep_Containers) TArray<FInvContainer> Containers;
 
+	/** Query helpers for Blueprints (Drag&Drop/UI) **/
+	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
+	bool GetEntryAtIndex(int32 ContainerIndex, int32 EntryIndex, FInv_InventoryEntry& OutEntry) const;
+	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
+	bool FindIndexByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32& OutEntryIndex) const;
+	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
+	bool CanAcceptFromPayload(int32 TargetContainerIndex, const FInventoryDragPayload& Payload) const;
+
 	/** Add / Remove / Transfer **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
@@ -60,9 +88,17 @@ public:
 	bool RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
+	bool TransferFromPayloadTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, const FInventoryDragPayload& Payload, int32& OutMoved);
 	// Auto-deposit only items that already exist in target container (hotkey support)
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved);
+
+	/** Swap support for Drag&Drop **/
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
+	bool SwapSlots(URpg_ContainerComponent* OtherComponent,
+		int32 ThisContainerIndex, int32 ThisSlotIndex,
+		int32 OtherContainerIndex, int32 OtherSlotIndex);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
@@ -74,6 +110,11 @@ public:
 	void ServerTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
 	void ServerAutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSwapSlots(URpg_ContainerComponent* OtherComponent,
+		int32 ThisContainerIndex, int32 ThisSlotIndex,
+		int32 OtherContainerIndex, int32 OtherSlotIndex);
 
 	/** Consumption **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")

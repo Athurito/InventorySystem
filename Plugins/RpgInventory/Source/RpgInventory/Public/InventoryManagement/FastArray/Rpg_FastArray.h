@@ -20,7 +20,7 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	GENERATED_BODY()
 	
 	FInv_InventoryEntry() {  }
-
+	
 	FGuid GetInstanceId() const {return InstanceId;}
 	void SetInstanceId(const FGuid NewInstanceId) {InstanceId = NewInstanceId;}
 	
@@ -54,8 +54,10 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	bool IsConsumable() const;
 	bool CanStackWith(const FInv_InventoryEntry& Other, const int32 MaxStackParam) const { return ItemId == Other.ItemId && GetStack() < MaxStackParam; }
 private:
-	UPROPERTY() FGuid           InstanceId;  
-	UPROPERTY() FPrimaryAssetId ItemId;      
+	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	FGuid InstanceId;
+	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	FPrimaryAssetId ItemId;      
 	UPROPERTY() FItemRuntimeDataContainer RuntimeData;
 	FGameplayTag ItemType = FGameplayTag::EmptyTag;
 	
@@ -94,11 +96,15 @@ public:
 	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
 	int32 FindIndexByInstance(const FGuid& InstanceId) const;
 	FInv_InventoryEntry* FindEntryMutableByInstance(const FGuid& InstanceId);
+	// New helpers for slot-style UI
+	bool IsValidEntryIndex(int32 Index) const { return Entries.IsValidIndex(Index); }
+	FInv_InventoryEntry* GetEntryMutableByIndex(int32 Index);
+	bool SwapEntriesByIndex(int32 IndexA, FInvContainer& Other, int32 IndexB);
 	// Auto-stack add; returns how many actually added and the (last) instance id used/created.
 	// If SourceRuntimeData is provided, it will be copied into any newly created stack (not applied to existing stacks).
- int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
-    // Remove quantity from an instance; removes entry when stack hits 0
-    bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
+	int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
+	// Remove quantity from an instance; removes entry when stack hits 0
+	bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 private:
 	//Replicated list of items
 	UPROPERTY()

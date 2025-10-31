@@ -105,6 +105,8 @@ void UContainerGrid::RebuildGrid()
 			continue;
 		}
 		SlotWidget->SetSlotIndex(Index);
+		// Provide owning context for BP drag&drop
+		SlotWidget->InitializeSlotContext(ContainerComponent.Get(), ContainerIndex);
 		
 		// Optional: simple stack display if entries align 1:1 with slots
 		if (const URpg_ContainerComponent* Comp = ContainerComponent.Get())

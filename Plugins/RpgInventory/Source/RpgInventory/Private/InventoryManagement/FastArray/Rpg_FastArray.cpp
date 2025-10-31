@@ -76,6 +76,27 @@ FInv_InventoryEntry* FInvContainer::FindEntryMutableByInstance(const FGuid& Inst
 	return nullptr;
 }
 
+FInv_InventoryEntry* FInvContainer::GetEntryMutableByIndex(int32 Index)
+{
+	if (Entries.IsValidIndex(Index))
+	{
+		return &Entries[Index];
+	}
+	return nullptr;
+}
+
+bool FInvContainer::SwapEntriesByIndex(int32 IndexA, FInvContainer& Other, int32 IndexB)
+{
+	if (!Entries.IsValidIndex(IndexA) || !Other.Entries.IsValidIndex(IndexB))
+	{
+		return false;
+	}
+	Swap(Entries[IndexA], Other.Entries[IndexB]);
+	MarkItemDirty(Entries[IndexA]);
+	Other.MarkItemDirty(Other.Entries[IndexB]);
+	return true;
+}
+
 int32 FInvContainer::AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded)
 {
 	OutAdded = 0;

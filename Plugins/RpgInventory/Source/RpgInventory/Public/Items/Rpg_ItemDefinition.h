@@ -29,6 +29,7 @@ public:
 	FText GetInteractionText() const { return InteractionText; }
 	const FGameplayTag& GetItemType() const { return ItemType; }
 
+	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UTexture2D* GetIcon() const;
 	
 	template<typename T>
