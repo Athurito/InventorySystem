@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
+#include "InventoryManagement/FastArray/Rpg_FastArray.h"
 #include "ContainerGrid.generated.h"
 
 class UContainerSlotButton;
 class URpg_ContainerComponent;
 class UUniformGridPanel;
+struct FInv_InventoryEntry;
 /**
  * Ein generisches Grid-Widget, das eine ContainerComponent repräsentiert.
  * Baut die eigentliche Darstellung nicht hart im Code auf, sondern stellt
@@ -38,10 +40,18 @@ public:
 
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeDestruct() override;
+
+	UFUNCTION()
+	void HandleItemAdded(FInv_InventoryEntry Item);
+	UFUNCTION()
+	void HandleItemRemoved(FInv_InventoryEntry Item);
 
 private:
 	void CacheFromDefinition();
 	void RebuildGrid();
+	void UnbindFromCurrent();
+	void BindDelegates();
 
 	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
 	int32 ContainerIndex = INDEX_NONE;

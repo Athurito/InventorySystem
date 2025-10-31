@@ -28,6 +28,18 @@ void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 	DOREPLIFETIME(URpg_ContainerComponent, Containers);
 }
 
+void URpg_ContainerComponent::OnRep_Containers()
+{
+	// Ensure owner is set on containers for client-side delegate forwarding
+	for (FInvContainer& C : Containers)
+	{
+		C.SetOwner(this);
+	}
+	// Trigger a generic update so UI can rebuild, since FastArray Pre/Post may have missed due to owner pointer
+	FInv_InventoryEntry Dummy; // default
+	OnItemAdded.Broadcast(Dummy);
+}
+
 int32 URpg_ContainerComponent::GetContainerCount() const
 {
 	return InitialContainerDefs.Num();
@@ -231,18 +243,33 @@ bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemCom
 	OutAdded = Added;
 	OutInstanceId = UsedInstance;
 
+	FInv_InventoryEntry* NewEntryPtr = nullptr;
 	// If a new stack was created, copy runtime data from the world item component into the new entry
 	if (LastIndex != INDEX_NONE)
 	{
-		FInv_InventoryEntry* NewEntry = Cont.FindEntryMutableByInstance(UsedInstance);
-		if (NewEntry)
+		NewEntryPtr = Cont.FindEntryMutableByInstance(UsedInstance);
+		if (NewEntryPtr)
 		{
-			NewEntry->CopyRuntimeDataFrom(ItemComponent->GetRuntimeData());
+			NewEntryPtr->CopyRuntimeDataFrom(ItemComponent->GetRuntimeData());
 			// Ensure the stack count matches what the container decided for the new stack
-			NewEntry->SetStack(NewEntry->GetStack());
+			NewEntryPtr->SetStack(NewEntryPtr->GetStack());
 		}
 	}
-	return LastIndex != INDEX_NONE || Added > 0;
+	const bool bSuccess = (LastIndex != INDEX_NONE) || (Added > 0);
+	if (bSuccess)
+	{
+		// Broadcast a change (new entry if we have it, otherwise a minimal entry with instance id)
+		if (NewEntryPtr)
+		{
+			OnItemAdded.Broadcast(*NewEntryPtr);
+		}
+		else
+		{
+			FInv_InventoryEntry Tmp; Tmp.SetInstanceId(UsedInstance); Tmp.SetItemId(Def->GetPrimaryAssetId());
+			OnItemAdded.Broadcast(Tmp);
+		}
+	}
+	return bSuccess;
 }
 
 bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved)
@@ -250,7 +277,34 @@ bool URpg_ContainerComponent::InternalRemoveItem(int32 ContainerIndex, const FGu
 	OutRemoved = 0;
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
 	if (!Containers.IsValidIndex(ContainerIndex)) return false;
-	return Containers[ContainerIndex].RemoveByInstance(InstanceId, Quantity, OutRemoved);
+	FInvContainer& Cont = Containers[ContainerIndex];
+	// Capture a copy before removal for UI update context
+	FInv_InventoryEntry* BeforePtr = Cont.FindEntryMutableByInstance(InstanceId);
+	FInv_InventoryEntry BeforeCopy;
+	if (BeforePtr)
+	{
+		BeforeCopy = *BeforePtr;
+	}
+	const bool bRemoved = Cont.RemoveByInstance(InstanceId, Quantity, OutRemoved);
+	if (bRemoved && OutRemoved > 0)
+	{
+		// Prefer to broadcast the remaining entry if it still exists; otherwise broadcast the before copy
+		FInv_InventoryEntry* AfterPtr = Cont.FindEntryMutableByInstance(InstanceId);
+		if (AfterPtr)
+		{
+			OnItemRemoved.Broadcast(*AfterPtr);
+		}
+		else if (BeforePtr)
+		{
+			OnItemRemoved.Broadcast(BeforeCopy);
+		}
+		else
+		{
+			FInv_InventoryEntry Tmp; Tmp.SetInstanceId(InstanceId);
+			OnItemRemoved.Broadcast(Tmp);
+		}
+	}
+	return bRemoved;
 }
 
 bool URpg_ContainerComponent::InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
@@ -332,11 +386,35 @@ bool URpg_ContainerComponent::InternalTransferItem(URpg_ContainerComponent* Targ
 
 	FGuid NewInstanceId = InstanceId;
 	int32 Added = 0;
-	Dst.AddOrStack(SrcEntry.GetItemId(), SrcEntry.GetItemType(), MaxStack, Remaining, NewInstanceId, Added);
+	int32 LastIndex = Dst.AddOrStack(SrcEntry.GetItemId(), SrcEntry.GetItemType(), MaxStack, Remaining, NewInstanceId, Added);
 	if (Added <= 0) return false;
 	int32 Removed = 0;
 	Src.RemoveByInstance(InstanceId, Added, Removed);
 	OutMoved = FMath::Min(Added, Removed);
+	if (OutMoved > 0)
+	{
+		// Broadcast to both components for immediate UI updates
+		FInv_InventoryEntry* AddedPtr = (LastIndex != INDEX_NONE) ? Dst.FindEntryMutableByInstance(NewInstanceId) : nullptr;
+		if (AddedPtr)
+		{
+			TargetComponent->OnItemAdded.Broadcast(*AddedPtr);
+		}
+		else
+		{
+			FInv_InventoryEntry TmpAdd; TmpAdd.SetInstanceId(NewInstanceId); TmpAdd.SetItemId(SrcEntry.GetItemId());
+			TargetComponent->OnItemAdded.Broadcast(TmpAdd);
+		}
+
+		FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(InstanceId);
+		if (RemainingPtr)
+		{
+			OnItemRemoved.Broadcast(*RemainingPtr);
+		}
+		else
+		{
+			OnItemRemoved.Broadcast(SrcEntry);
+		}
+	}
 	return OutMoved > 0;
 }
 

@@ -39,6 +39,8 @@ class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
 public:
 	URpg_ContainerComponent();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	UFUNCTION()
+	void OnRep_Containers();
 
 	// Initial Container-Defs (im Editor/Blueprint setzen)
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
@@ -47,7 +49,7 @@ public:
 	int32 GetContainerCount() const;
 	
 	// Runtime Container (Meta + FastArray)
-	UPROPERTY(Replicated) TArray<FInvContainer> Containers;
+	UPROPERTY(ReplicatedUsing=OnRep_Containers) TArray<FInvContainer> Containers;
 
 	/** Add / Remove / Transfer **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
@@ -98,9 +100,11 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
 	FOnItemConsumedSignature OnItemConsumed;
 	
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Container")
 	FInventoryItemChange OnItemAdded;
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Container")
 	FInventoryItemChange OnItemRemoved;
-	
+		
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;

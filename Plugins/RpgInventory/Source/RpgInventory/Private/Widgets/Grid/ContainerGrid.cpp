@@ -8,16 +8,54 @@
 #include "Items/Rpg_ItemDefinition.h"
 #include "Widgets/GridSlots/ContainerSlotButton.h"
 
+void UContainerGrid::BindDelegates()
+{
+	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
+	{
+		Comp->OnItemAdded.RemoveAll(this);
+		Comp->OnItemRemoved.RemoveAll(this);
+		Comp->OnItemAdded.AddDynamic(this, &UContainerGrid::HandleItemAdded);
+		Comp->OnItemRemoved.AddDynamic(this, &UContainerGrid::HandleItemRemoved);
+	}
+}
+
+void UContainerGrid::UnbindFromCurrent()
+{
+	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
+	{
+		Comp->OnItemAdded.RemoveAll(this);
+		Comp->OnItemRemoved.RemoveAll(this);
+	}
+}
+
 void UContainerGrid::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 }
 
+void UContainerGrid::NativeDestruct()
+{
+	UnbindFromCurrent();
+	Super::NativeDestruct();
+}
+
 void UContainerGrid::BindToContainer(URpg_ContainerComponent* InComponent, int32 InContainerIndex)
 {
+	UnbindFromCurrent();
 	ContainerComponent = InComponent;
 	ContainerIndex = InContainerIndex;
 	CacheFromDefinition();
+	BindDelegates();
+	RebuildGrid();
+}
+
+void UContainerGrid::HandleItemAdded(FInv_InventoryEntry Item)
+{
+	RebuildGrid();
+}
+
+void UContainerGrid::HandleItemRemoved(FInv_InventoryEntry Item)
+{
 	RebuildGrid();
 }
 
