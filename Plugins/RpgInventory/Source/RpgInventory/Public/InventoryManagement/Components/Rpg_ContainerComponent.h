@@ -66,8 +66,7 @@ class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
 public:
 	URpg_ContainerComponent();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
-	UFUNCTION()
-	void OnRep_Containers();
+	
 
 	// Initial Container-Defs (im Editor/Blueprint setzen)
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
@@ -107,11 +106,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved);
 
-	/** Swap support for Drag&Drop **/
-	UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
-	bool SwapSlots(URpg_ContainerComponent* OtherComponent,
-		int32 ThisContainerIndex, int32 ThisSlotIndex,
-		int32 OtherContainerIndex, int32 OtherSlotIndex);
+	
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
@@ -127,10 +122,14 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerAutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex);
 
-	UFUNCTION(Server, Reliable)
-	void ServerSwapSlots(URpg_ContainerComponent* OtherComponent,
+
+	/** Swap support for Drag&Drop **/
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
+	bool SwapSlots(URpg_ContainerComponent* OtherComponent,
 		int32 ThisContainerIndex, int32 ThisSlotIndex,
 		int32 OtherContainerIndex, int32 OtherSlotIndex);
+	
+	
 
 	/** Consumption **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Consume")
@@ -175,6 +174,9 @@ public:
 	FGuid GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const;
 
 	void AssignInstanceToSlotUnique(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
+
+	void ReconcileMappingFromEntries(int32 ContainerIdx);
+	void ClearMappingForInstance(int32 ContainerIdx, const FGuid& InstanceId);
 		
 	void AddRepSubObject(UObject* SubObject);
 protected:
@@ -184,6 +186,20 @@ protected:
 
 	virtual void BeginPlay() override;
 private:
+
+
+	UFUNCTION(Server, Reliable)
+	void ServerSwapSlots(URpg_ContainerComponent* OtherComponent,
+		int32 ThisContainerIndex, int32 ThisSlotIndex,
+		int32 OtherContainerIndex, int32 OtherSlotIndex);
+
+	bool InternalSwapSlots(URpg_ContainerComponent* OtherComponent,
+		int32 ThisContainerIndex, int32 ThisSlotIndex,
+		int32 OtherContainerIndex, int32 OtherSlotIndex);
+	
+	bool ApplyLocalMappingForTransfer(const FInventoryDragPayload& Payload,
+		URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32 TargetSlotIndex);
+	
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
@@ -192,4 +208,7 @@ private:
 	int32 TargetContainerIndex,
 	int32 TargetSlotIndex,
 	int32& OutMoved);
+
+	UFUNCTION()
+	void OnRep_Containers();
 };

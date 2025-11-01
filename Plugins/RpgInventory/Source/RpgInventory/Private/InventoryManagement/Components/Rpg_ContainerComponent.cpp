@@ -30,14 +30,50 @@ void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 
 void URpg_ContainerComponent::OnRep_Containers()
 {
-	// Ensure owner is set on containers for client-side delegate forwarding
-	for (FInvContainer& C : Containers)
+	// Owner setzen, dann Mapping für jeden Container „versöhnen“
+	for (int32 i = 0; i < Containers.Num(); ++i)
 	{
-		C.SetOwner(this);
+		Containers[i].SetOwner(this);
+
+		// Mapping-Größe herstellen
+		const int32 total = Containers[i].Rows * Containers[i].Cols;
+		EnsureSlotMapSize(i, total);
+
+		// 1) Alle derzeit gemappten InstanceIds einsammeln
+		TSet<FGuid> mapped;
+		FContainerSlotMap& map = ContainerSlotMaps.FindOrAdd(i);
+		for (const FGuid& id : map.SlotToInstance)
+			if (id.IsValid()) mapped.Add(id);
+
+		// 2) Nicht mehr existierende IDs aus Mapping entfernen
+		TSet<FGuid> existing;
+		for (const FInv_InventoryEntry& e : Containers[i].GetEntries())
+			existing.Add(e.GetInstanceId());
+
+		for (FGuid& id : map.SlotToInstance)
+			if (id.IsValid() && !existing.Contains(id))
+				id.Invalidate();
+
+		// 3) Un-gemappte Entries auf freie Slots legen
+		for (const FInv_InventoryEntry& e : Containers[i].GetEntries())
+		{
+			if (map.SlotToInstance.Contains(e.GetInstanceId())) continue; // schon gemappt
+
+			// freien Slot suchen
+			for (int32 s = 0; s < map.SlotToInstance.Num(); ++s)
+			{
+				if (!map.SlotToInstance[s].IsValid())
+				{
+					AssignInstanceToSlotUnique(i, s, e.GetInstanceId()); // sorgt für Eindeutigkeit
+					break;
+				}
+			}
+		}
 	}
-	// Trigger a generic update so UI can rebuild, since FastArray Pre/Post may have missed due to owner pointer
-	FInv_InventoryEntry Dummy; // default
-	OnItemAdded.Broadcast(Dummy);
+
+	// optional: UI-Refresh anstoßen
+	FInv_InventoryEntry dummy;
+	OnItemAdded.Broadcast(dummy);
 }
 
 int32 URpg_ContainerComponent::GetContainerCount() const
@@ -172,6 +208,42 @@ void URpg_ContainerComponent::AssignInstanceToSlotUnique(int32 ContainerIdx, int
 	Map.SlotToInstance[SlotIdx] = InstanceId;
 }
 
+void URpg_ContainerComponent::ReconcileMappingFromEntries(int32 ContainerIdx)
+{
+	if (!Containers.IsValidIndex(ContainerIdx)) return;
+	const FInvContainer& C = Containers[ContainerIdx];
+	const int32 Total = C.Rows * C.Cols;
+	EnsureSlotMapSize(ContainerIdx, Total);
+
+	// markiere belegte Instanzen
+	TSet<FGuid> AlreadyMapped;
+	for (int32 s=0; s<ContainerSlotMaps[ContainerIdx].SlotToInstance.Num(); ++s) {
+		const FGuid Id = ContainerSlotMaps[ContainerIdx].SlotToInstance[s];
+		if (Id.IsValid()) AlreadyMapped.Add(Id);
+	}
+
+	// lege nicht gemappte Entries auf erste freien Slots
+	for (const FInv_InventoryEntry& E : C.GetEntries()) {
+		if (AlreadyMapped.Contains(E.GetInstanceId())) continue;
+		// suche freien Slot
+		for (int32 s=0; s<Total; ++s) {
+			if (!ContainerSlotMaps[ContainerIdx].SlotToInstance[s].IsValid()) {
+				AssignInstanceToSlotUnique(ContainerIdx, s, E.GetInstanceId());
+				AlreadyMapped.Add(E.GetInstanceId());
+				break;
+			}
+		}
+	}
+}
+
+void URpg_ContainerComponent::ClearMappingForInstance(int32 ContainerIdx, const FGuid& InstanceId)
+{
+	if (FContainerSlotMap* Map = ContainerSlotMaps.Find(ContainerIdx)) {
+		for (FGuid& Id : Map->SlotToInstance)
+			if (Id == InstanceId) { Id = FGuid(); }
+	}
+}
+
 void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 {
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
@@ -289,6 +361,135 @@ void URpg_ContainerComponent::BeginPlay()
 		C.TabIcon      = Def->TabIcon;
 		Containers.Add(MoveTemp(C));
 	}
+}
+
+bool URpg_ContainerComponent::InternalSwapSlots(URpg_ContainerComponent* OtherComponent, int32 ThisContainerIndex,
+	int32 ThisSlotIndex, int32 OtherContainerIndex, int32 OtherSlotIndex)
+{
+	if (!Containers.IsValidIndex(ThisContainerIndex)) return false;
+    if (!OtherComponent->Containers.IsValidIndex(OtherContainerIndex)) return false;
+
+    FInvContainer& ACont = Containers[ThisContainerIndex];
+    FInvContainer& BCont = OtherComponent->Containers[OtherContainerIndex];
+
+    // No-op: gleicher Slot
+    if (OtherComponent == this &&
+        ThisContainerIndex == OtherContainerIndex &&
+        ThisSlotIndex == OtherSlotIndex) return false;
+
+    // Slot-Mappings absichern
+    const int32 ATotal = ACont.Rows * ACont.Cols;
+    const int32 BTotal = BCont.Rows * BCont.Cols;
+    EnsureSlotMapSize(ThisContainerIndex, ATotal);
+    OtherComponent->EnsureSlotMapSize(OtherContainerIndex, BTotal);
+
+    // Aktuelle InstanceIds aus den Slots lesen
+    const FGuid AId = GetSlotInstance(ThisContainerIndex, ThisSlotIndex);
+    const FGuid BId = OtherComponent->GetSlotInstance(OtherContainerIndex, OtherSlotIndex);
+
+    // Wenn beide leer -> nix zu tun
+    if (!AId.IsValid() && !BId.IsValid()) return false;
+
+    // Entry-Lookups (optional für Allowed/Events)
+    auto FindEntry = [](FInvContainer& C, const FGuid& Id) -> FInv_InventoryEntry*
+    {
+        return Id.IsValid() ? C.FindEntryMutableByInstance(Id) : nullptr;
+    };
+
+    FInv_InventoryEntry* AEntry = FindEntry(ACont, AId);
+    FInv_InventoryEntry* BEntry = FindEntry(BCont, BId);
+
+    // Allowed-Checks (nur für die Seite, die tatsächlich bewegt wird)
+    // Fall 1: beide belegt -> prüfen, ob A ins B darf und B ins A darf
+    if (AId.IsValid() && BId.IsValid())
+    {
+        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        // Reines Mapping-Swap
+        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+
+        // UI-Events für beide Seiten
+        if (AEntry) { OnItemRemoved.Broadcast(*AEntry); OnItemAdded.Broadcast(*AEntry); }
+        if (BEntry) { OtherComponent->OnItemRemoved.Broadcast(*BEntry); OtherComponent->OnItemAdded.Broadcast(*BEntry); }
+
+        return true;
+    }
+
+    // Fall 2: nur A belegt -> move A -> B
+    if (AId.IsValid() && !BId.IsValid())
+    {
+        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        // Ziel-Slot bekommt A, Quell-Slot wird geleert
+        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+        ClearSlot(ThisContainerIndex, ThisSlotIndex);
+
+        // UI-Events
+        if (AEntry)
+        {
+            // „aus A entfernt / in B hinzugefügt“ – für unmittelbares UI-Update
+            OnItemRemoved.Broadcast(*AEntry);
+            OtherComponent->OnItemAdded.Broadcast(*AEntry);
+        }
+        return true;
+    }
+
+    // Fall 3: nur B belegt -> move B -> A
+    if (!AId.IsValid() && BId.IsValid())
+    {
+        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+        OtherComponent->ClearSlot(OtherContainerIndex, OtherSlotIndex);
+
+        if (BEntry)
+        {
+            OtherComponent->OnItemRemoved.Broadcast(*BEntry);
+            OnItemAdded.Broadcast(*BEntry);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+bool URpg_ContainerComponent::ApplyLocalMappingForTransfer(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32 TargetSlotIndex)
+{
+	URpg_ContainerComponent* SourceComponent = Payload.SourceComponent.Get();
+	if (!SourceComponent || !TargetComponent) return false;
+
+	if (!SourceComponent->Containers.IsValidIndex(Payload.SourceContainerIndex)) return false;
+	if (!TargetComponent->Containers.IsValidIndex(TargetContainerIndex)) return false;
+
+	FInvContainer& Src = SourceComponent->Containers[Payload.SourceContainerIndex];
+	FInvContainer& Dst = TargetComponent->Containers[TargetContainerIndex];
+
+	SourceComponent->EnsureSlotMapSize(Payload.SourceContainerIndex, Src.Rows * Src.Cols);
+	TargetComponent->EnsureSlotMapSize(TargetContainerIndex, Dst.Rows * Dst.Cols);
+
+	const bool bSameComp = (TargetComponent == SourceComponent);
+	const bool bSameCont = bSameComp && (Payload.SourceContainerIndex == TargetContainerIndex);
+
+	const FInv_InventoryEntry* SrcEntry = SourceComponent->GetEntryBySlot(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+	if (!SrcEntry) return false;
+
+	const int32 SrcCount = SrcEntry->GetStack();
+	const int32 RequestedQty = (Payload.Quantity <= 0) ? SrcCount : FMath::Min(Payload.Quantity, SrcCount);
+
+	// Nur: Same-Container, Target leer, voller Stack -> reines Umhängen
+	const FGuid TargetInst = TargetComponent->GetSlotInstance(TargetContainerIndex, TargetSlotIndex);
+	if (bSameCont && !TargetInst.IsValid() && RequestedQty >= SrcCount)
+	{
+		TargetComponent->AssignInstanceToSlotUnique(TargetContainerIndex, TargetSlotIndex, Payload.InstanceId);
+		SourceComponent->ClearSlot(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+		return true;
+	}
+
+	// alle anderen Fälle: keine Mapping-Änderung (Server entscheidet/erzeugt neue IDs)
+	return false;
 }
 
 bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
@@ -670,7 +871,7 @@ bool URpg_ContainerComponent::TransferItem(const FInventoryDragPayload& Payload,
 	{
 		return InternalTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, OutMoved);
 	}
-	
+	ApplyLocalMappingForTransfer(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
 	ServerTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
 	return false;
 }
@@ -719,105 +920,43 @@ bool URpg_ContainerComponent::SwapSlots(URpg_ContainerComponent* OtherComponent,
 {
 	if (!OtherComponent) return false;
 
-    // Authority / RPC wie gehabt
-    if (!(GetOwner() && GetOwner()->HasAuthority()))
-    {
-        ServerSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
-        return false;
-    }
+	const bool bHasAuthority = GetOwner() && GetOwner()->HasAuthority();
+	if (bHasAuthority) {
+		return InternalSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
+	}
 
-    if (!Containers.IsValidIndex(ThisContainerIndex)) return false;
-    if (!OtherComponent->Containers.IsValidIndex(OtherContainerIndex)) return false;
+	// --- Client: optimistisches Mapping ---
+	if (!Containers.IsValidIndex(ThisContainerIndex) || !OtherComponent->Containers.IsValidIndex(OtherContainerIndex))
+		return false;
 
-    FInvContainer& ACont = Containers[ThisContainerIndex];
-    FInvContainer& BCont = OtherComponent->Containers[OtherContainerIndex];
+	FInvContainer& ACont = Containers[ThisContainerIndex];
+	FInvContainer& BCont = OtherComponent->Containers[OtherContainerIndex];
 
-    // No-op: gleicher Slot
-    if (OtherComponent == this &&
-        ThisContainerIndex == OtherContainerIndex &&
-        ThisSlotIndex == OtherSlotIndex) return false;
+	EnsureSlotMapSize(ThisContainerIndex, ACont.Rows * ACont.Cols);
+	OtherComponent->EnsureSlotMapSize(OtherContainerIndex, BCont.Rows * BCont.Cols);
 
-    // Slot-Mappings absichern
-    const int32 ATotal = ACont.Rows * ACont.Cols;
-    const int32 BTotal = BCont.Rows * BCont.Cols;
-    EnsureSlotMapSize(ThisContainerIndex, ATotal);
-    OtherComponent->EnsureSlotMapSize(OtherContainerIndex, BTotal);
+	const FGuid AId = GetSlotInstance(ThisContainerIndex, ThisSlotIndex);
+	const FGuid BId = OtherComponent->GetSlotInstance(OtherContainerIndex, OtherSlotIndex);
 
-    // Aktuelle InstanceIds aus den Slots lesen
-    const FGuid AId = GetSlotInstance(ThisContainerIndex, ThisSlotIndex);
-    const FGuid BId = OtherComponent->GetSlotInstance(OtherContainerIndex, OtherSlotIndex);
+	if (AId.IsValid() && BId.IsValid()) {
+		AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+		OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+	} else if (AId.IsValid()) { // move A -> B
+		OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+		ClearSlot(ThisContainerIndex, ThisSlotIndex);
+	} else if (BId.IsValid()) { // move B -> A
+		AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+		OtherComponent->ClearSlot(OtherContainerIndex, OtherSlotIndex);
+	} // beide leer: no-op
 
-    // Wenn beide leer -> nix zu tun
-    if (!AId.IsValid() && !BId.IsValid()) return false;
-
-    // Entry-Lookups (optional für Allowed/Events)
-    auto FindEntry = [](FInvContainer& C, const FGuid& Id) -> FInv_InventoryEntry*
-    {
-        return Id.IsValid() ? C.FindEntryMutableByInstance(Id) : nullptr;
-    };
-
-    FInv_InventoryEntry* AEntry = FindEntry(ACont, AId);
-    FInv_InventoryEntry* BEntry = FindEntry(BCont, BId);
-
-    // Allowed-Checks (nur für die Seite, die tatsächlich bewegt wird)
-    // Fall 1: beide belegt -> prüfen, ob A ins B darf und B ins A darf
-    if (AId.IsValid() && BId.IsValid())
-    {
-        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
-        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
-
-        // Reines Mapping-Swap
-        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
-        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
-
-        // UI-Events für beide Seiten
-        if (AEntry) { OnItemRemoved.Broadcast(*AEntry); OnItemAdded.Broadcast(*AEntry); }
-        if (BEntry) { OtherComponent->OnItemRemoved.Broadcast(*BEntry); OtherComponent->OnItemAdded.Broadcast(*BEntry); }
-
-        return true;
-    }
-
-    // Fall 2: nur A belegt -> move A -> B
-    if (AId.IsValid() && !BId.IsValid())
-    {
-        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
-
-        // Ziel-Slot bekommt A, Quell-Slot wird geleert
-        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
-        ClearSlot(ThisContainerIndex, ThisSlotIndex);
-
-        // UI-Events
-        if (AEntry)
-        {
-            // „aus A entfernt / in B hinzugefügt“ – für unmittelbares UI-Update
-            OnItemRemoved.Broadcast(*AEntry);
-            OtherComponent->OnItemAdded.Broadcast(*AEntry);
-        }
-        return true;
-    }
-
-    // Fall 3: nur B belegt -> move B -> A
-    if (!AId.IsValid() && BId.IsValid())
-    {
-        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
-
-        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
-        OtherComponent->ClearSlot(OtherContainerIndex, OtherSlotIndex);
-
-        if (BEntry)
-        {
-            OtherComponent->OnItemRemoved.Broadcast(*BEntry);
-            OnItemAdded.Broadcast(*BEntry);
-        }
-        return true;
-    }
-
-    return false;
+	// RPC
+	ServerSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
+	return true;
 }
 
 void URpg_ContainerComponent::ServerSwapSlots_Implementation(URpg_ContainerComponent* OtherComponent, int32 ThisContainerIndex, int32 ThisSlotIndex, int32 OtherContainerIndex, int32 OtherSlotIndex)
 {
-	SwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
+	InternalSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
 }
 
 bool URpg_ContainerComponent::AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved)
@@ -923,7 +1062,9 @@ void URpg_ContainerComponent::ServerTransferItem_Implementation(const FInventory
 	int32 TargetContainerIndex,
 	int32 TargetSlotIndex)
 {
-	int32 Dummy; InternalTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, Dummy);
+	FInventoryDragPayload ServerPayload = Payload;
+	ServerPayload.SourceComponent = this; // <— WICHTIG
+	int32 Dummy; InternalTransferItem(ServerPayload, TargetComponent, TargetContainerIndex, TargetSlotIndex, Dummy);
 }
 
 void URpg_ContainerComponent::ServerAutoDepositMatchingTo_Implementation(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex)
