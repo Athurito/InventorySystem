@@ -77,76 +77,75 @@ void UContainerGrid::CacheFromDefinition()
 
 void UContainerGrid::RebuildGrid()
 {
-	if (!GridRoot)
-	{
-		return;
-	}
-
+	if (!GridRoot || !SlotButtonClass) return;
 	GridRoot->ClearChildren();
-
-	if (!SlotButtonClass)
-	{
-		return;
-	}
-
 	// Cache für Item Definitions erstellen
 	TMap<FPrimaryAssetId, URpg_ItemDefinition*> DefinitionCache;
 
 	// Create buttons in row-major order
 	const int32 Total = GetTotalSlots();
+	
+	// WICHTIG: Stelle sicher, dass das Mapping existiert und die richtige Größe hat
+	if (const URpg_ContainerComponent* Comp = ContainerComponent.Get())
+	{
+		if (Comp->Containers.IsValidIndex(ContainerIndex))
+		{
+			// non-const helper wäre besser, hier ggf. const_cast oder expose Ensure über const
+			const_cast<URpg_ContainerComponent*>(Comp)->EnsureSlotMapSize(ContainerIndex, Total);
+		}
+	}
+	
 	for (int32 Index = 0; Index < Total; ++Index)
 	{
 		const int32 Row = CachedCols > 0 ? Index / CachedCols : 0;
 		const int32 Col = CachedCols > 0 ? Index % CachedCols : 0;
 
 		UContainerSlotButton* SlotWidget = CreateWidget<UContainerSlotButton>(GetOwningPlayer(), SlotButtonClass);
-		if (!SlotWidget)
-		{
-			continue;
-		}
+		if (!SlotWidget) continue;
+
 		SlotWidget->SetSlotIndex(Index);
-		// Provide owning context for BP drag&drop
 		SlotWidget->InitializeSlotContext(ContainerComponent.Get(), ContainerIndex);
-		
-		// Optional: simple stack display if entries align 1:1 with slots
+
+		// Anzeige anhand Slot→InstanceId Mapping
+		const FInv_InventoryEntry* EntryPtr = nullptr;
 		if (const URpg_ContainerComponent* Comp = ContainerComponent.Get())
 		{
-			if (Comp->Containers.IsValidIndex(ContainerIndex))
+			EntryPtr = Comp->GetEntryBySlot(ContainerIndex, Index);
+		}
+
+		if (EntryPtr)
+		{
+			const FPrimaryAssetId& ItemId = EntryPtr->GetItemId();
+
+			URpg_ItemDefinition*& ItemDefinitionRef =
+				DefinitionCache.FindOrAdd(ItemId, UInventoryStatics::GetItemDefinitionById(ItemId));
+
+			if (ItemDefinitionRef)
 			{
-				const FInvContainer& C = Comp->Containers[ContainerIndex];
-				if (C.GetEntries().IsValidIndex(Index))
-				{
-					auto& Entry = C.GetEntries()[Index];
-					const FPrimaryAssetId& ItemId = Entry.GetItemId();
-
-					// Prüfen ob Definition bereits im Cache ist, sonst laden und cachen
-					URpg_ItemDefinition** CachedDef = DefinitionCache.Find(ItemId);
-					URpg_ItemDefinition* ItemDefinition = nullptr;
-					
-					if (CachedDef)
-					{
-						ItemDefinition = *CachedDef;
-					}
-					else
-					{
-						ItemDefinition = UInventoryStatics::GetItemDefinitionById(ItemId);
-						DefinitionCache.Add(ItemId, ItemDefinition);
-					}
-
-					if (ItemDefinition)
-					{
-						SlotWidget->SetStackCount(Entry.GetStack());
-						const auto Icon = ItemDefinition->GetIcon();
-						SlotWidget->UpdateIcon(Icon);
-						SlotWidget->UpdateText();
-					}
-				}
+				SlotWidget->SetStackCount(EntryPtr->GetStack());
+				const auto Icon = ItemDefinitionRef->GetIcon();
+				SlotWidget->UpdateIcon(Icon);
+				SlotWidget->UpdateText();
 			}
+			else
+			{
+				// Fallback falls Def fehlt
+				SlotWidget->SetStackCount(EntryPtr->GetStack());
+				SlotWidget->UpdateIcon(nullptr);
+				SlotWidget->UpdateText();
+			}
+		}
+		else
+		{
+			// Leerer Slot visuell „clearen“
+			SlotWidget->SetStackCount(0);
+			SlotWidget->UpdateIcon(nullptr);
+			SlotWidget->UpdateText();
 		}
 
 		if (UUniformGridSlot* GridSlot = GridRoot->AddChildToUniformGrid(SlotWidget, Row, Col))
 		{
-			// Optional spacing/alignment could be adjusted here
+			// spacing/alignment optional
 		}
 	}
 }

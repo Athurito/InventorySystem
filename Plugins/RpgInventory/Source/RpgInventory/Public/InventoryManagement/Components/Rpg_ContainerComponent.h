@@ -30,6 +30,13 @@ struct FInventoryDragPayload
 	int32 Quantity = 0; // 0 or less means all
 };
 
+USTRUCT()
+struct FContainerSlotMap
+{
+	GENERATED_BODY()
+	UPROPERTY() TArray<FGuid> SlotToInstance; // Größe = Rows*Cols, FGuid() == leer
+};
+
 // Forward declarations to avoid heavy includes
 enum class EInventorySlotType : uint8;
 enum class EUseContext : uint8;
@@ -76,8 +83,6 @@ public:
 	bool GetEntryAtIndex(int32 ContainerIndex, int32 EntryIndex, FInv_InventoryEntry& OutEntry) const;
 	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
 	bool FindIndexByInstance(int32 ContainerIndex, const FGuid& InstanceId, int32& OutEntryIndex) const;
-	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
-	bool CanAcceptFromPayload(int32 TargetContainerIndex, const FInventoryDragPayload& Payload) const;
 
 	/** Add / Remove / Transfer **/
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
@@ -87,9 +92,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool RemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
-	bool TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
+	bool TransferItem(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
+	int32& OutMoved);
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
-	bool TransferFromPayloadTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, const FInventoryDragPayload& Payload, int32& OutMoved);
+	bool TransferFromPayloadTo(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
+	int32& OutMoved);
 	// Auto-deposit only items that already exist in target container (hotkey support)
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved);
@@ -107,7 +120,10 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerRemoveItemFromContainer(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	UFUNCTION(Server, Reliable)
-	void ServerTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity);
+	void ServerTransferItem(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex);
 	UFUNCTION(Server, Reliable)
 	void ServerAutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex);
 
@@ -145,19 +161,35 @@ public:
 	FInventoryItemChange OnItemAdded;
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Container")
 	FInventoryItemChange OnItemRemoved;
+
+	
+	UPROPERTY()
+	TMap<int32, FContainerSlotMap> ContainerSlotMaps; // Key = ContainerIndex
+
+	// Helper:
+	const FInv_InventoryEntry* GetEntryBySlot(int32 ContainerIdx, int32 SlotIdx) const;
+	FInv_InventoryEntry* GetEntryBySlotMutable(int32 ContainerIdx, int32 SlotIdx);
+	void EnsureSlotMapSize(int32 ContainerIdx, int32 TotalSlots);
+	void SetSlotInstance(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
+	void ClearSlot(int32 ContainerIdx, int32 SlotIdx);
+	FGuid GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const;
+
+	void AssignInstanceToSlotUnique(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
 		
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
 	bool InternalUseItem_Inventory(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	bool InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity);
-	
-	static bool ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply);
 
 	virtual void BeginPlay() override;
 private:
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalRemoveItem(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
-	bool InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved);
+	bool InternalTransferItem(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
+	int32& OutMoved);
 };

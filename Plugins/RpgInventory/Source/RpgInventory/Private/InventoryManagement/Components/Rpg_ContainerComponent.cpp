@@ -86,6 +86,92 @@ UInventoryContainerDefinition* URpg_ContainerComponent::GetContainerDefinition(c
 	return Def.IsValid() ? Def.Get() : Def.LoadSynchronous();
 }
 
+const FInv_InventoryEntry* URpg_ContainerComponent::GetEntryBySlot(int32 ContainerIdx, int32 SlotIdx) const
+{
+	if (!Containers.IsValidIndex(ContainerIdx)) return nullptr;
+
+	const FInvContainer& C = Containers[ContainerIdx];
+	const int32 Total = C.Rows * C.Cols;
+	const_cast<URpg_ContainerComponent*>(this)->EnsureSlotMapSize(ContainerIdx, Total);
+
+	const FGuid Id = GetSlotInstance(ContainerIdx, SlotIdx);
+	if (!Id.IsValid()) return nullptr;
+
+	const int32 EntryIdx = C.FindIndexByInstance(Id);
+	if (EntryIdx == INDEX_NONE) return nullptr;
+
+	return &C.GetEntries()[EntryIdx];
+}
+
+FInv_InventoryEntry* URpg_ContainerComponent::GetEntryBySlotMutable(int32 ContainerIdx, int32 SlotIdx)
+{
+	if (!Containers.IsValidIndex(ContainerIdx)) return nullptr;
+	const FGuid Id = GetSlotInstance(ContainerIdx, SlotIdx);
+	if (!Id.IsValid()) return nullptr;
+	return Containers[ContainerIdx].FindEntryMutableByInstance(Id);
+}
+
+void URpg_ContainerComponent::EnsureSlotMapSize(int32 ContainerIdx, int32 TotalSlots)
+{
+	FContainerSlotMap& Map = ContainerSlotMaps.FindOrAdd(ContainerIdx);
+	if (Map.SlotToInstance.Num() != TotalSlots) {
+		Map.SlotToInstance.SetNum(TotalSlots);
+		// Optional: initial befüllen – z. B. erste N Entries auf Slots 0..N-1
+		if (Containers.IsValidIndex(ContainerIdx)) {
+			const auto& Entries = Containers[ContainerIdx].GetEntries();
+			const int32 Count = FMath::Min(TotalSlots, Entries.Num());
+			for (int32 i=0; i<Count; ++i) {
+				Map.SlotToInstance[i] = Entries[i].GetInstanceId();
+			}
+		}
+	}
+}
+
+void URpg_ContainerComponent::SetSlotInstance(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId)
+{
+	if (!Containers.IsValidIndex(ContainerIdx)) return;
+	const int32 Total = Containers[ContainerIdx].Rows * Containers[ContainerIdx].Cols;
+	EnsureSlotMapSize(ContainerIdx, Total);
+	FContainerSlotMap& Map = ContainerSlotMaps.FindOrAdd(ContainerIdx);
+	if (Map.SlotToInstance.IsValidIndex(SlotIdx)) {
+		Map.SlotToInstance[SlotIdx] = InstanceId;
+	}
+}
+
+void URpg_ContainerComponent::ClearSlot(int32 ContainerIdx, int32 SlotIdx)
+{
+	if (FContainerSlotMap* Map = ContainerSlotMaps.Find(ContainerIdx)) {
+		if (Map->SlotToInstance.IsValidIndex(SlotIdx)) {
+			Map->SlotToInstance[SlotIdx] = FGuid(); // leer
+		}
+	}
+}
+
+FGuid URpg_ContainerComponent::GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const
+{
+	if (const FContainerSlotMap* Map = ContainerSlotMaps.Find(ContainerIdx)) {
+		if (Map->SlotToInstance.IsValidIndex(SlotIdx)) {
+			return Map->SlotToInstance[SlotIdx];
+		}
+	}
+	return FGuid();
+}
+
+void URpg_ContainerComponent::AssignInstanceToSlotUnique(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId)
+{
+	if (!Containers.IsValidIndex(ContainerIdx)) return;
+	const int32 Total = Containers[ContainerIdx].Rows * Containers[ContainerIdx].Cols;
+	EnsureSlotMapSize(ContainerIdx, Total);
+
+	FContainerSlotMap& Map = ContainerSlotMaps.FindOrAdd(ContainerIdx);
+	// gleiche InstanceId aus allen anderen Slots entfernen
+	for (int32 i = 0; i < Map.SlotToInstance.Num(); ++i)
+		if (i != SlotIdx && Map.SlotToInstance[i] == InstanceId)
+			Map.SlotToInstance[i] = FGuid();
+
+	Map.SlotToInstance[SlotIdx] = InstanceId;
+}
+
 void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 {
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
@@ -180,23 +266,6 @@ bool URpg_ContainerComponent::InternalUseItem_World(URpg_ItemComponent* ItemComp
 	}
 
 	return false;
-}
-
-bool URpg_ContainerComponent::ApplyCostsAndReplicate(FItemRuntimeDataContainer& Runtime, const URpg_ItemDefinition* Def, int32 QuantityPerUse, int32 UsesToApply)
-{
-	bool bChanged = false;
-	if (const FStackableFragment* Stackable = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
-	{
-		if (auto* S = Runtime.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
-		{
-			const int32 Max = FMath::Max(1, Stackable->GetMaxStackSize());
-			const int32 Cost = QuantityPerUse * UsesToApply;
-			S->CurrentStackCount = FMath::Clamp(S->CurrentStackCount - Cost, 0, Max);
-			Runtime.MarkDirty(FragmentTags::StackableFragment);
-			bChanged = true;
-		}
-	}
-	return bChanged;
 }
 
 void URpg_ContainerComponent::BeginPlay()
@@ -349,69 +418,217 @@ bool URpg_ContainerComponent::AddItemToContainerById(int32 ContainerIndex, FPrim
 	}
 }
 
-bool URpg_ContainerComponent::InternalTransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved)
+bool URpg_ContainerComponent::InternalTransferItem(const FInventoryDragPayload& Payload,
+    URpg_ContainerComponent* TargetComponent,
+    int32 TargetContainerIndex,
+    int32 TargetSlotIndex,
+    int32& OutMoved)
 {
 	OutMoved = 0;
-	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
-	if (!TargetComponent) return false;
-	if (!Containers.IsValidIndex(SourceContainerIndex)) return false;
-	if (!TargetComponent->Containers.IsValidIndex(TargetContainerIndex)) return false;
 
-	FInvContainer& Src = Containers[SourceContainerIndex];
-	FInvContainer& Dst = TargetComponent->Containers[TargetContainerIndex];
+    // --- Basic guards / authority ---
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+    if (!TargetComponent) return false;
 
-	// Allow intra-component transfers; UI will prevent no-op same-slot. Keep only basic validation below.
-	const int32 SrcIdx = Src.FindIndexByInstance(InstanceId);
-	if (SrcIdx == INDEX_NONE) return false;
-	const FInv_InventoryEntry SrcEntry = Src.GetEntries()[SrcIdx];
-	// Respect destination allowed items
-	if (!Dst.IsItemAllowed(SrcEntry.GetItemType())) return false;
+    URpg_ContainerComponent* SourceComponent = Payload.SourceComponent.Get();
+    if (!SourceComponent) return false;
 
-	int32 Remaining = Quantity;
-	if (Remaining <= 0) return false;
+    if (!SourceComponent->Containers.IsValidIndex(Payload.SourceContainerIndex)) return false;
+    if (!TargetComponent->Containers.IsValidIndex(TargetContainerIndex)) return false;
 
-	URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(SrcEntry.GetItemId());
+    FInvContainer& Src = SourceComponent->Containers[Payload.SourceContainerIndex];
+    FInvContainer& Dst = TargetComponent->Containers[TargetContainerIndex];
 
-	if (!Def)
-	{
-		return false; // could not resolve definition from id
-	}
-	
-	const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
-	const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
+    // Slot-Mappings vorbereiten
+    const int32 SrcTotal = Src.Rows * Src.Cols;
+    const int32 DstTotal = Dst.Rows * Dst.Cols;
+    SourceComponent->EnsureSlotMapSize(Payload.SourceContainerIndex, SrcTotal);
+    TargetComponent->EnsureSlotMapSize(TargetContainerIndex, DstTotal);
 
-	FGuid NewInstanceId = InstanceId;
-	int32 Added = 0;
-	int32 LastIndex = Dst.AddOrStack(SrcEntry.GetItemId(), SrcEntry.GetItemType(), MaxStack, Remaining, NewInstanceId, Added);
-	if (Added <= 0) return false;
-	int32 Removed = 0;
-	Src.RemoveByInstance(InstanceId, Added, Removed);
-	OutMoved = FMath::Min(Added, Removed);
-	if (OutMoved > 0)
-	{
-		// Broadcast to both components for immediate UI updates
-		FInv_InventoryEntry* AddedPtr = (LastIndex != INDEX_NONE) ? Dst.FindEntryMutableByInstance(NewInstanceId) : nullptr;
-		if (AddedPtr)
-		{
-			TargetComponent->OnItemAdded.Broadcast(*AddedPtr);
-		}
-		else
-		{
-			FInv_InventoryEntry TmpAdd; TmpAdd.SetInstanceId(NewInstanceId); TmpAdd.SetItemId(SrcEntry.GetItemId());
-			TargetComponent->OnItemAdded.Broadcast(TmpAdd);
-		}
+    // Quelle lokalisieren
+    const int32 SrcIdx = Src.FindIndexByInstance(Payload.InstanceId);
+    if (SrcIdx == INDEX_NONE) return false;
 
-		FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(InstanceId);
-		if (RemainingPtr)
-		{
-			OnItemRemoved.Broadcast(*RemainingPtr);
-		}
-		else
-		{
-			OnItemRemoved.Broadcast(SrcEntry);
-		}
-	}
-	return OutMoved > 0;
+    FInv_InventoryEntry SrcEntry = Src.GetEntries()[SrcIdx]; // Snapshot für Events
+
+    // Menge bestimmen: 0/negativ = alles
+    int32 RequestedQty = Payload.Quantity;
+    if (RequestedQty <= 0) {
+        RequestedQty = SrcEntry.GetStack();
+    }
+    if (RequestedQty <= 0) return false;
+
+    // Definition / MaxStack
+    URpg_ItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(SrcEntry.GetItemId());
+    if (!Def) return false;
+
+    const FStackableFragment* Stackable = Def->GetFragmentOfType<FStackableFragment>();
+    const int32 MaxStack = Stackable ? FMath::Max(1, Stackable->GetMaxStackSize()) : 1;
+
+    // Zielslot-Instance ermitteln
+    const FGuid TargetInst = TargetComponent->GetSlotInstance(TargetContainerIndex, TargetSlotIndex);
+
+    const bool bSameComponent = (TargetComponent == SourceComponent);
+    const bool bSameContainer = bSameComponent && (Payload.SourceContainerIndex == TargetContainerIndex);
+
+    // Destination akzeptiert Item?
+    if (!Dst.IsItemAllowed(SrcEntry.GetItemType())) return false;
+
+    // ====== FALL A: Gleicher Container (Grid-internes Drag&Drop) ======
+    if (bSameContainer)
+    {
+        // 1) Zielslot belegt?
+        if (TargetInst.IsValid())
+        {
+            const int32 DstIdx = Dst.FindIndexByInstance(TargetInst);
+            if (DstIdx == INDEX_NONE) return false;
+
+            FInv_InventoryEntry* DstEntryPtr = Dst.FindEntryMutableByInstance(TargetInst);
+            if (!DstEntryPtr) return false;
+
+            // 1.1) Gleiches Item -> gezielt in diesen Slot stacken
+            if (DstEntryPtr->GetItemId() == SrcEntry.GetItemId())
+            {
+                int32 Added = 0;
+                if (!Dst.StackIntoIndex(DstIdx, MaxStack, RequestedQty, Added)) return false;
+                if (Added <= 0) return false;
+
+                int32 Removed = 0;
+                Src.RemoveByInstance(Payload.InstanceId, Added, Removed);
+                OutMoved = FMath::Min(Added, Removed);
+
+                // Quelle leer? SourceSlot Mapping leeren
+                if (!Src.FindEntryMutableByInstance(Payload.InstanceId))
+                {
+                    SourceComponent->ClearSlot(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+                }
+
+                // Events
+                TargetComponent->OnItemAdded.Broadcast(*DstEntryPtr);
+                if (FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(Payload.InstanceId))
+                    SourceComponent->OnItemRemoved.Broadcast(*RemainingPtr);
+                else
+                    SourceComponent->OnItemRemoved.Broadcast(SrcEntry);
+
+                return OutMoved > 0;
+            }
+            else
+            {
+                // 1.2) Anderes Item -> Slot-SWAP (nur Mapping!)
+                const FGuid A = SourceComponent->GetSlotInstance(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+                const FGuid B = TargetInst;
+
+                SourceComponent->AssignInstanceToSlotUnique(Payload.SourceContainerIndex, Payload.SourceSlotIndex, B);
+                TargetComponent->AssignInstanceToSlotUnique(TargetContainerIndex, TargetSlotIndex, A);
+
+                // Optional: Sofortige UI-Signale
+                if (FInv_InventoryEntry* AE = Src.FindEntryMutableByInstance(B))
+                    SourceComponent->OnItemRemoved.Broadcast(*AE); // moved innerhalb des Grids
+                if (FInv_InventoryEntry* BE = Dst.FindEntryMutableByInstance(A))
+                    TargetComponent->OnItemAdded.Broadcast(*BE);
+
+                OutMoved = 0; // kein Mengen-Transfer
+                return true;
+            }
+        }
+        else
+        {
+        	// Ganze Menge? -> Instanz nur umhängen
+        	if (RequestedQty >= SrcEntry.GetStack())
+        	{
+        		TargetComponent->AssignInstanceToSlotUnique(TargetContainerIndex, TargetSlotIndex, Payload.InstanceId);
+        		SourceComponent->ClearSlot(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+        		OutMoved = SrcEntry.GetStack();
+        		// (optional) Events
+        		if (FInv_InventoryEntry* MovedPtr = Src.FindEntryMutableByInstance(Payload.InstanceId))
+        			TargetComponent->OnItemAdded.Broadcast(*MovedPtr);
+        		SourceComponent->OnItemRemoved.Broadcast(SrcEntry);
+        		return true;
+        	}
+
+        	// Teilmenge -> Stack splitten
+        	FGuid NewInst;
+        	if (!Src.SplitIntoNewEntry(Payload.InstanceId, RequestedQty, NewInst)) return false;
+        	TargetComponent->AssignInstanceToSlotUnique(TargetContainerIndex, TargetSlotIndex, NewInst);
+        	OutMoved = RequestedQty;
+
+        	// Events
+        	if (FInv_InventoryEntry* AddedPtr = Src.FindEntryMutableByInstance(NewInst))
+        		TargetComponent->OnItemAdded.Broadcast(*AddedPtr);
+        	if (FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(Payload.InstanceId))
+        		SourceComponent->OnItemRemoved.Broadcast(*RemainingPtr);
+        	else
+        		SourceComponent->OnItemRemoved.Broadcast(SrcEntry);
+
+        	return true;
+        }
+    }
+
+    // ====== FALL B: Cross-Container / anderes Component ======
+    {
+        // Ziel belegt?
+        if (TargetInst.IsValid())
+        {
+            const int32 DstIdx = Dst.FindIndexByInstance(TargetInst);
+            if (DstIdx == INDEX_NONE) return false;
+            FInv_InventoryEntry* DstEntryPtr = Dst.FindEntryMutableByInstance(TargetInst);
+            if (!DstEntryPtr) return false;
+
+            // Nur stacken, wenn Item identisch
+            if (DstEntryPtr->GetItemId() == SrcEntry.GetItemId())
+            {
+                int32 Added = 0;
+                if (!Dst.StackIntoIndex(DstIdx, MaxStack, RequestedQty, Added)) return false;
+                if (Added <= 0) return false;
+
+                int32 Removed = 0;
+                Src.RemoveByInstance(Payload.InstanceId, Added, Removed);
+                OutMoved = FMath::Min(Added, Removed);
+
+                // Quelle leer? (nur wenn Quelle ein gemapptes Grid ist)
+                if (bSameComponent && !Src.FindEntryMutableByInstance(Payload.InstanceId))
+                {
+                    SourceComponent->ClearSlot(Payload.SourceContainerIndex, Payload.SourceSlotIndex);
+                }
+
+                TargetComponent->OnItemAdded.Broadcast(*DstEntryPtr);
+                if (FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(Payload.InstanceId))
+                    SourceComponent->OnItemRemoved.Broadcast(*RemainingPtr);
+                else
+                    SourceComponent->OnItemRemoved.Broadcast(SrcEntry);
+
+                return OutMoved > 0;
+            }
+            else
+            {
+                // Kein Swap über Container-Grenzen (Design-Entscheidung) – abbrechen
+                return false;
+            }
+        }
+        else
+        {
+        	FGuid NewInst;
+        	const int32 ToCreate = RequestedQty; // exakt diese Menge als neuer Stack
+        	const int32 NewIdx = Dst.AddNewStackExact(SrcEntry.GetItemId(), SrcEntry.GetItemType(), ToCreate, NewInst);
+        	if (NewIdx == INDEX_NONE) return false;
+
+        	TargetComponent->AssignInstanceToSlotUnique(TargetContainerIndex, TargetSlotIndex, NewInst);
+
+        	int32 Removed = 0;
+        	Src.RemoveByInstance(Payload.InstanceId, ToCreate, Removed);
+        	OutMoved = Removed;
+
+        	// Events
+        	if (FInv_InventoryEntry* AddedPtr = Dst.FindEntryMutableByInstance(NewInst))
+        		TargetComponent->OnItemAdded.Broadcast(*AddedPtr);
+        	if (FInv_InventoryEntry* RemainingPtr = Src.FindEntryMutableByInstance(Payload.InstanceId))
+        		SourceComponent->OnItemRemoved.Broadcast(*RemainingPtr);
+        	else
+        		SourceComponent->OnItemRemoved.Broadcast(SrcEntry);
+
+        	return OutMoved > 0;
+        }
+    }
 }
 
 bool URpg_ContainerComponent::AddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId)
@@ -443,27 +660,37 @@ bool URpg_ContainerComponent::RemoveItemFromContainer(int32 ContainerIndex, cons
 	}
 }
 
-bool URpg_ContainerComponent::TransferItem(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutMoved)
+bool URpg_ContainerComponent::TransferItem(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
+	int32& OutMoved)
 {
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		return InternalTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity, OutMoved);
+		return InternalTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, OutMoved);
 	}
-	else
-	{
-		ServerTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity);
-		OutMoved = 0;
-		return false;
-	}
+	
+	ServerTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
+	return false;
 }
 
 bool URpg_ContainerComponent::GetEntryAtIndex(int32 ContainerIndex, int32 EntryIndex, FInv_InventoryEntry& OutEntry) const
 {
 	OutEntry = FInv_InventoryEntry();
+
 	if (!Containers.IsValidIndex(ContainerIndex)) return false;
+
 	const FInvContainer& C = Containers[ContainerIndex];
-	if (!C.GetEntries().IsValidIndex(EntryIndex)) return false;
-	OutEntry = C.GetEntries()[EntryIndex];
+	const int32 Total = C.Rows * C.Cols;
+
+	// WICHTIG: Mapping-Größe sicherstellen, sonst ist GetSlotInstance u.U. leer
+	const_cast<URpg_ContainerComponent*>(this)->EnsureSlotMapSize(ContainerIndex, Total);
+
+	const FInv_InventoryEntry* Ptr = GetEntryBySlot(ContainerIndex, EntryIndex);
+	if (!Ptr) return false;             // <- leerer Slot: sauber false zurückgeben
+
+	OutEntry = *Ptr;
 	return true;
 }
 
@@ -475,86 +702,117 @@ bool URpg_ContainerComponent::FindIndexByInstance(int32 ContainerIndex, const FG
 	return OutEntryIndex != INDEX_NONE;
 }
 
-bool URpg_ContainerComponent::CanAcceptFromPayload(int32 TargetContainerIndex, const FInventoryDragPayload& Payload) const
-{
-	const URpg_ContainerComponent* SrcComp = Payload.SourceComponent.Get();
-	if (!SrcComp) return false;
-	if (!SrcComp->Containers.IsValidIndex(Payload.SourceContainerIndex)) return false;
-	if (!Containers.IsValidIndex(TargetContainerIndex)) return false;
-
-	const FInvContainer& Src = SrcComp->Containers[Payload.SourceContainerIndex];
-	const FInvContainer& Dst = Containers[TargetContainerIndex];
-	const int32 SrcIdx = Src.FindIndexByInstance(Payload.InstanceId);
-	if (SrcIdx == INDEX_NONE) return false;
-	const FInv_InventoryEntry& SrcEntry = Src.GetEntries()[SrcIdx];
-	return Dst.IsItemAllowed(SrcEntry.GetItemType());
-}
-
-bool URpg_ContainerComponent::TransferFromPayloadTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, const FInventoryDragPayload& Payload, int32& OutMoved)
+bool URpg_ContainerComponent::TransferFromPayloadTo(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
+	int32& OutMoved)
 {
 	OutMoved = 0;
 	URpg_ContainerComponent* SrcComp = Payload.SourceComponent.Get();
 	if (!SrcComp) return false;
-	const int32 Quantity = Payload.Quantity > 0 ? Payload.Quantity : INT_MAX/4;
-	return SrcComp->TransferItem(TargetComponent, Payload.SourceContainerIndex, TargetContainerIndex, Payload.InstanceId, Quantity, OutMoved);
+	
+	return SrcComp->TransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, OutMoved);
 }
 
 bool URpg_ContainerComponent::SwapSlots(URpg_ContainerComponent* OtherComponent, int32 ThisContainerIndex, int32 ThisSlotIndex, int32 OtherContainerIndex, int32 OtherSlotIndex)
 {
 	if (!OtherComponent) return false;
-	if (!(GetOwner() && GetOwner()->HasAuthority()))
-	{
-		ServerSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
-		return false;
-	}
-	if (!Containers.IsValidIndex(ThisContainerIndex)) return false;
-	if (!OtherComponent->Containers.IsValidIndex(OtherContainerIndex)) return false;
-	FInvContainer& A = Containers[ThisContainerIndex];
-	FInvContainer& B = OtherComponent->Containers[OtherContainerIndex];
-	if (!A.IsValidEntryIndex(ThisSlotIndex) || !B.IsValidEntryIndex(OtherSlotIndex)) return false;
 
-	// No-op: same comp and same slot
-	if (OtherComponent == this && ThisContainerIndex == OtherContainerIndex && ThisSlotIndex == OtherSlotIndex) return false;
+    // Authority / RPC wie gehabt
+    if (!(GetOwner() && GetOwner()->HasAuthority()))
+    {
+        ServerSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
+        return false;
+    }
 
-	FInv_InventoryEntry* EntryA = A.GetEntryMutableByIndex(ThisSlotIndex);
-	FInv_InventoryEntry* EntryB = B.GetEntryMutableByIndex(OtherSlotIndex);
-	const bool bAEmpty = !EntryA || EntryA->GetInstanceId().IsValid() == false;
-	const bool bBEmpty = !EntryB || EntryB->GetInstanceId().IsValid() == false;
+    if (!Containers.IsValidIndex(ThisContainerIndex)) return false;
+    if (!OtherComponent->Containers.IsValidIndex(OtherContainerIndex)) return false;
 
-	// If one side empty: move the other
-	if (bAEmpty ^ bBEmpty)
-	{
-		URpg_ContainerComponent* SrcComp = bBEmpty ? this : OtherComponent;
-		URpg_ContainerComponent* DstComp = bBEmpty ? OtherComponent : this;
-		const int32 SrcContainerIdx = bBEmpty ? ThisContainerIndex : OtherContainerIndex;
-		const int32 DstContainerIdx = bBEmpty ? OtherContainerIndex : ThisContainerIndex;
-		FInv_InventoryEntry* MoveEntry = bBEmpty ? EntryA : EntryB;
-		if (!MoveEntry) return false;
-		int32 Moved = 0;
-		return SrcComp->InternalTransferItem(DstComp, SrcContainerIdx, DstContainerIdx, MoveEntry->GetInstanceId(), MoveEntry->GetStack(), Moved);
-	}
+    FInvContainer& ACont = Containers[ThisContainerIndex];
+    FInvContainer& BCont = OtherComponent->Containers[OtherContainerIndex];
 
-	// Both have items: check allowed types for each destination
-	if (!B.IsItemAllowed(EntryA->GetItemType()) || !A.IsItemAllowed(EntryB->GetItemType()))
-	{
-		return false;
-	}
-	// Perform swap
-	const bool bSwapped = A.SwapEntriesByIndex(ThisSlotIndex, B, OtherSlotIndex);
-	if (!bSwapped) return false;
+    // No-op: gleicher Slot
+    if (OtherComponent == this &&
+        ThisContainerIndex == OtherContainerIndex &&
+        ThisSlotIndex == OtherSlotIndex) return false;
 
-	// Broadcast updates for UI
-	if (A.IsValidEntryIndex(ThisSlotIndex))
-	{
-		OnItemRemoved.Broadcast(A.GetEntries()[ThisSlotIndex]);
-		OnItemAdded.Broadcast(A.GetEntries()[ThisSlotIndex]);
-	}
-	if (B.IsValidEntryIndex(OtherSlotIndex))
-	{
-		OtherComponent->OnItemRemoved.Broadcast(B.GetEntries()[OtherSlotIndex]);
-		OtherComponent->OnItemAdded.Broadcast(B.GetEntries()[OtherSlotIndex]);
-	}
-	return true;
+    // Slot-Mappings absichern
+    const int32 ATotal = ACont.Rows * ACont.Cols;
+    const int32 BTotal = BCont.Rows * BCont.Cols;
+    EnsureSlotMapSize(ThisContainerIndex, ATotal);
+    OtherComponent->EnsureSlotMapSize(OtherContainerIndex, BTotal);
+
+    // Aktuelle InstanceIds aus den Slots lesen
+    const FGuid AId = GetSlotInstance(ThisContainerIndex, ThisSlotIndex);
+    const FGuid BId = OtherComponent->GetSlotInstance(OtherContainerIndex, OtherSlotIndex);
+
+    // Wenn beide leer -> nix zu tun
+    if (!AId.IsValid() && !BId.IsValid()) return false;
+
+    // Entry-Lookups (optional für Allowed/Events)
+    auto FindEntry = [](FInvContainer& C, const FGuid& Id) -> FInv_InventoryEntry*
+    {
+        return Id.IsValid() ? C.FindEntryMutableByInstance(Id) : nullptr;
+    };
+
+    FInv_InventoryEntry* AEntry = FindEntry(ACont, AId);
+    FInv_InventoryEntry* BEntry = FindEntry(BCont, BId);
+
+    // Allowed-Checks (nur für die Seite, die tatsächlich bewegt wird)
+    // Fall 1: beide belegt -> prüfen, ob A ins B darf und B ins A darf
+    if (AId.IsValid() && BId.IsValid())
+    {
+        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        // Reines Mapping-Swap
+        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+
+        // UI-Events für beide Seiten
+        if (AEntry) { OnItemRemoved.Broadcast(*AEntry); OnItemAdded.Broadcast(*AEntry); }
+        if (BEntry) { OtherComponent->OnItemRemoved.Broadcast(*BEntry); OtherComponent->OnItemAdded.Broadcast(*BEntry); }
+
+        return true;
+    }
+
+    // Fall 2: nur A belegt -> move A -> B
+    if (AId.IsValid() && !BId.IsValid())
+    {
+        if (!BCont.IsItemAllowed(AEntry ? AEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        // Ziel-Slot bekommt A, Quell-Slot wird geleert
+        OtherComponent->AssignInstanceToSlotUnique(OtherContainerIndex, OtherSlotIndex, AId);
+        ClearSlot(ThisContainerIndex, ThisSlotIndex);
+
+        // UI-Events
+        if (AEntry)
+        {
+            // „aus A entfernt / in B hinzugefügt“ – für unmittelbares UI-Update
+            OnItemRemoved.Broadcast(*AEntry);
+            OtherComponent->OnItemAdded.Broadcast(*AEntry);
+        }
+        return true;
+    }
+
+    // Fall 3: nur B belegt -> move B -> A
+    if (!AId.IsValid() && BId.IsValid())
+    {
+        if (!ACont.IsItemAllowed(BEntry ? BEntry->GetItemType() : FGameplayTag::EmptyTag)) return false;
+
+        AssignInstanceToSlotUnique(ThisContainerIndex, ThisSlotIndex, BId);
+        OtherComponent->ClearSlot(OtherContainerIndex, OtherSlotIndex);
+
+        if (BEntry)
+        {
+            OtherComponent->OnItemRemoved.Broadcast(*BEntry);
+            OnItemAdded.Broadcast(*BEntry);
+        }
+        return true;
+    }
+
+    return false;
 }
 
 void URpg_ContainerComponent::ServerSwapSlots_Implementation(URpg_ContainerComponent* OtherComponent, int32 ThisContainerIndex, int32 ThisSlotIndex, int32 OtherContainerIndex, int32 OtherSlotIndex)
@@ -660,9 +918,12 @@ void URpg_ContainerComponent::ServerAddItemToContainerById_Implementation(int32 
 	int32 DummyAdded; FGuid DummyId; InternalAddItemById(ContainerIndex, ItemId, Quantity, DummyAdded, DummyId);
 }
 
-void URpg_ContainerComponent::ServerTransferItem_Implementation(URpg_ContainerComponent* TargetComponent, int32 SourceContainerIndex, int32 TargetContainerIndex, const FGuid& InstanceId, int32 Quantity)
+void URpg_ContainerComponent::ServerTransferItem_Implementation(const FInventoryDragPayload& Payload,
+	URpg_ContainerComponent* TargetComponent,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex)
 {
-	int32 Dummy; InternalTransferItem(TargetComponent, SourceContainerIndex, TargetContainerIndex, InstanceId, Quantity, Dummy);
+	int32 Dummy; InternalTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, Dummy);
 }
 
 void URpg_ContainerComponent::ServerAutoDepositMatchingTo_Implementation(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex)
@@ -670,3 +931,4 @@ void URpg_ContainerComponent::ServerAutoDepositMatchingTo_Implementation(URpg_Co
 	int32 DummyMoved = 0;
 	AutoDepositMatchingTo(TargetComponent, TargetContainerIndex, DummyMoved);
 }
+

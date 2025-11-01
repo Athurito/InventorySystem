@@ -96,15 +96,18 @@ public:
 	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
 	int32 FindIndexByInstance(const FGuid& InstanceId) const;
 	FInv_InventoryEntry* FindEntryMutableByInstance(const FGuid& InstanceId);
-	// New helpers for slot-style UI
 	bool IsValidEntryIndex(int32 Index) const { return Entries.IsValidIndex(Index); }
 	FInv_InventoryEntry* GetEntryMutableByIndex(int32 Index);
 	bool SwapEntriesByIndex(int32 IndexA, FInvContainer& Other, int32 IndexB);
-	// Auto-stack add; returns how many actually added and the (last) instance id used/created.
-	// If SourceRuntimeData is provided, it will be copied into any newly created stack (not applied to existing stacks).
 	int32 AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 MaxStack, int32 Quantity, FGuid& OutInstanceId, int32& OutAdded);
-	// Remove quantity from an instance; removes entry when stack hits 0
 	bool RemoveByInstance(const FGuid& InstanceId, int32 Quantity, int32& OutRemoved);
+	bool StackIntoIndex(int32 Index, int32 MaxStack, int32 Quantity, int32& OutAdded);
+
+	int32 AddNewStackExact(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType,
+									  int32 Quantity, FGuid& OutInstanceId);
+
+	bool SplitIntoNewEntry(const FGuid& SourceInstanceId, int32 SplitQty, FGuid& OutNewInstanceId);
+
 private:
 	//Replicated list of items
 	UPROPERTY()

@@ -171,3 +171,55 @@ bool FInvContainer::RemoveByInstance(const FGuid& InstanceId, int32 Quantity, in
 	}
 	return true;
 }
+
+bool FInvContainer::StackIntoIndex(int32 Index, int32 MaxStack, int32 Quantity, int32& OutAdded)
+{
+	OutAdded = 0;
+	if (!Entries.IsValidIndex(Index) || Quantity <= 0 || MaxStack <= 0) return false;
+	FInv_InventoryEntry& E = Entries[Index];
+	const int32 Free = MaxStack - E.GetStack();
+	if (Free <= 0) return false;
+	const int32 ToAdd = FMath::Min(Free, Quantity);
+	E.SetStack(E.GetStack() + ToAdd);
+	MarkItemDirty(E);
+	OutAdded = ToAdd;
+	return true;
+}
+
+int32 FInvContainer::AddNewStackExact(const FPrimaryAssetId& ItemId, const FGameplayTag& ItemType, int32 Quantity, FGuid& OutInstanceId)
+{
+	if (Quantity <= 0) return INDEX_NONE;
+	FInv_InventoryEntry NewE;
+	NewE.SetItemId(ItemId);
+	NewE.SetItemType(ItemType);
+	NewE.SetInstanceId(FGuid::NewGuid());
+	NewE.SetStack(Quantity);
+	const int32 NewIdx = Entries.Add(NewE);
+	MarkItemDirty(Entries[NewIdx]);
+	OutInstanceId = NewE.GetInstanceId();
+	return NewIdx;
+}
+
+bool FInvContainer::SplitIntoNewEntry(const FGuid& SourceInstanceId, int32 SplitQty, FGuid& OutNewInstanceId)
+{
+	const int32 SrcIdx = FindIndexByInstance(SourceInstanceId);
+	if (SrcIdx == INDEX_NONE) return false;
+	FInv_InventoryEntry& E = Entries[SrcIdx];
+	const int32 Cur = E.GetStack();
+	if (SplitQty <= 0 || SplitQty >= Cur) return false;
+
+	FInv_InventoryEntry NewE;
+	NewE.SetItemId(E.GetItemId());
+	NewE.SetItemType(E.GetItemType());
+	NewE.SetInstanceId(FGuid::NewGuid());
+	NewE.SetStack(SplitQty);
+
+	const int32 NewIdx = Entries.Add(NewE);
+	MarkItemDirty(Entries[NewIdx]);
+
+	E.SetStack(Cur - SplitQty);
+	MarkItemDirty(E);
+
+	OutNewInstanceId = NewE.GetInstanceId();
+	return true;
+}
