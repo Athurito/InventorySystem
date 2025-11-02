@@ -169,7 +169,6 @@ public:
 	const FInv_InventoryEntry* GetEntryBySlot(int32 ContainerIdx, int32 SlotIdx) const;
 	FInv_InventoryEntry* GetEntryBySlotMutable(int32 ContainerIdx, int32 SlotIdx);
 	void EnsureSlotMapSize(int32 ContainerIdx, int32 TotalSlots);
-	void SetSlotInstance(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
 	void ClearSlot(int32 ContainerIdx, int32 SlotIdx);
 	FGuid GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const;
 

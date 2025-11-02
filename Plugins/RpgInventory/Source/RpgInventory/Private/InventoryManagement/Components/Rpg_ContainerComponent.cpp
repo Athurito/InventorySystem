@@ -163,16 +163,6 @@ void URpg_ContainerComponent::EnsureSlotMapSize(int32 ContainerIdx, int32 TotalS
 	}
 }
 
-void URpg_ContainerComponent::SetSlotInstance(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId)
-{
-	if (!Containers.IsValidIndex(ContainerIdx)) return;
-	const int32 Total = Containers[ContainerIdx].Rows * Containers[ContainerIdx].Cols;
-	EnsureSlotMapSize(ContainerIdx, Total);
-	FContainerSlotMap& Map = ContainerSlotMaps.FindOrAdd(ContainerIdx);
-	if (Map.SlotToInstance.IsValidIndex(SlotIdx)) {
-		Map.SlotToInstance[SlotIdx] = InstanceId;
-	}
-}
 
 void URpg_ContainerComponent::ClearSlot(int32 ContainerIdx, int32 SlotIdx)
 {
@@ -863,7 +853,7 @@ bool URpg_ContainerComponent::RemoveItemFromContainer(int32 ContainerIndex, cons
 
 bool URpg_ContainerComponent::TransferItem(const FInventoryDragPayload& Payload,
 	URpg_ContainerComponent* TargetComponent,
-	int32 TargetContainerIndex,
+	int32 TargetContainerIndex,																	
 	int32 TargetSlotIndex,
 	int32& OutMoved)
 {
@@ -871,7 +861,12 @@ bool URpg_ContainerComponent::TransferItem(const FInventoryDragPayload& Payload,
 	{
 		return InternalTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex, OutMoved);
 	}
-	ApplyLocalMappingForTransfer(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
+	const bool bLocallyApplied = ApplyLocalMappingForTransfer(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
+	if (bLocallyApplied)
+	{
+		// Trigger UI refresh on client immediately
+		FInv_InventoryEntry Dummy; OnItemAdded.Broadcast(Dummy);
+	}
 	ServerTransferItem(Payload, TargetComponent, TargetContainerIndex, TargetSlotIndex);
 	return false;
 }
@@ -949,6 +944,15 @@ bool URpg_ContainerComponent::SwapSlots(URpg_ContainerComponent* OtherComponent,
 		OtherComponent->ClearSlot(OtherContainerIndex, OtherSlotIndex);
 	} // beide leer: no-op
 
+	// Immediate UI refresh on client after local optimistic mapping
+	{
+		FInv_InventoryEntry Dummy;
+		OnItemAdded.Broadcast(Dummy);
+		if (OtherComponent && OtherComponent != this)
+		{
+			OtherComponent->OnItemAdded.Broadcast(Dummy);
+		}
+	}
 	// RPC
 	ServerSwapSlots(OtherComponent, ThisContainerIndex, ThisSlotIndex, OtherContainerIndex, OtherSlotIndex);
 	return true;
