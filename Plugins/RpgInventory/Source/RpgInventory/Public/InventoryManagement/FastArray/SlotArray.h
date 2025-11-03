@@ -27,6 +27,8 @@ struct FInvSlotArray : public FFastArraySerializer
 
 	// Owner zeigt auf ContainerComponent (wie bei FInvContainer::OwnerComponent)
 	UPROPERTY(Transient) TObjectPtr<UActorComponent> OwnerComponent = nullptr;
+	UPROPERTY(Transient) int32 OwnerContainerIndex = INDEX_NONE;
+	
 
 	// Helper
 	void Init(int32 NumSlots)

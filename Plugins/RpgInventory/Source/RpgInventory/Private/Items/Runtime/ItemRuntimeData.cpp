@@ -5,6 +5,7 @@
 
 void FItemRuntimeDataContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedAdd FItemRuntimeDataContainer"));
 	if (OwnerComponent && OwnerInstanceId.IsValid())
 	{
 		const FInv_InventoryEntry Dummy;
@@ -14,6 +15,7 @@ void FItemRuntimeDataContainer::PostReplicatedAdd(const TArrayView<int32> AddedI
 
 void FItemRuntimeDataContainer::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedChange FItemRuntimeDataContainer"));
 	if (OwnerComponent && OwnerInstanceId.IsValid())
 	{
 		const FInv_InventoryEntry Dummy;
@@ -23,6 +25,7 @@ void FItemRuntimeDataContainer::PostReplicatedChange(const TArrayView<int32> Cha
 
 void FItemRuntimeDataContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PreReplicatedRemove FItemRuntimeDataContainer"));
 	if (OwnerComponent && OwnerInstanceId.IsValid())
 	{
 		const FInv_InventoryEntry Dummy;

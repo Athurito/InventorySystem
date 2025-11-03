@@ -7,6 +7,7 @@
 
 void FInvSlotArray::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PreReplicatedRemove SlotArray"));
 	if (auto* CC = Cast<URpg_ContainerComponent>(OwnerComponent))
 	{
 		for (int32 Idx : RemovedIndices)
@@ -19,6 +20,7 @@ void FInvSlotArray::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, 
 
 void FInvSlotArray::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedAdd SlotArray"));
 	if (auto* CC = Cast<URpg_ContainerComponent>(OwnerComponent))
 	{
 		for (int32 Idx : AddedIndices)
@@ -31,6 +33,7 @@ void FInvSlotArray::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int3
 
 void FInvSlotArray::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedChange SlotArray"));
 	if (auto* CC = Cast<URpg_ContainerComponent>(OwnerComponent))
 	{
 		for (int32 Idx : ChangedIndices)

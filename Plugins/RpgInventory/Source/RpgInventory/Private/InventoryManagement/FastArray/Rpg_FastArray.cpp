@@ -14,6 +14,7 @@ void FInv_InventoryEntry::SetStack(const int32 NewStack)
 
 void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PreReplicatedRemove FInvContainer"));
 	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
 
 	if (!InventoryComponent)
@@ -29,6 +30,7 @@ void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, 
 
 void FInvContainer::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedChange FInvContainer"));
 	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
 	if (!InventoryComponent) return;
 
@@ -40,6 +42,7 @@ void FInvContainer::PostReplicatedChange(const TArrayView<int32> ChangedIndices,
 
 void FInvContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
+	UE_LOG(LogTemp, Warning, TEXT("PostReplicatedAdd FInvContainer"));
 	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
 
 	if (!InventoryComponent)

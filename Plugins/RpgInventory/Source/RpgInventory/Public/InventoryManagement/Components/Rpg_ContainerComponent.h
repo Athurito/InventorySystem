@@ -133,7 +133,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Container")
 	bool AutoDepositMatchingTo(URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32& OutTotalMoved);
 
-	
+	virtual void PreNetReceive() override;
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItemToContainer(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity);
@@ -218,9 +218,6 @@ private:
 	bool InternalSwapSlots(URpg_ContainerComponent* OtherComponent,
 		int32 ThisContainerIndex, int32 ThisSlotIndex,
 		int32 OtherContainerIndex, int32 OtherSlotIndex);
-	
-	bool ApplyLocalMappingForTransfer(const FInventoryDragPayload& Payload,
-		URpg_ContainerComponent* TargetComponent, int32 TargetContainerIndex, int32 TargetSlotIndex);
 	
 	bool InternalAddItem(int32 ContainerIndex, URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
 	bool InternalAddItemById(int32 ContainerIndex, const FPrimaryAssetId& ItemId, int32 Quantity, int32& OutAdded, FGuid& OutInstanceId);
