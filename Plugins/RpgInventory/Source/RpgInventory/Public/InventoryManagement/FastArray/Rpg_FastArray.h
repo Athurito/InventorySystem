@@ -35,11 +35,11 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 		// Default wenn kein StackableRuntimeData existiert
 		return 1;
 	}
-	void SetStack(const int32 NewStack) {
-		if (FStackableRuntimeData* D = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
-		{
-			D->CurrentStackCount = NewStack;
-		}
+	void SetStack(const int32 NewStack);
+	void SetRuntimeDataOwner(URpg_ContainerComponent* NewOwner)
+	{
+		RuntimeData.OwnerComponent = NewOwner;
+		RuntimeData.OwnerInstanceId = InstanceId;
 	}
 
 	FGameplayTag GetItemType() const {return ItemType;}
@@ -48,10 +48,8 @@ struct FInv_InventoryEntry : public FFastArraySerializerItem
 	// Access to runtime data (for container/component bridging)
 	const FItemRuntimeDataContainer& GetRuntimeData() const { return RuntimeData; }
 	FItemRuntimeDataContainer& GetRuntimeDataMutable() { return RuntimeData; }
-	void CopyRuntimeDataFrom(const FItemRuntimeDataContainer& Src) { RuntimeData = Src; }
+	void CopyRuntimeDataFrom(const FItemRuntimeDataContainer& Src) { RuntimeData.CopyFrom(Src); }
 	
-	bool IsStackable() const;
-	bool IsConsumable() const;
 	bool CanStackWith(const FInv_InventoryEntry& Other, const int32 MaxStackParam) const { return ItemId == Other.ItemId && GetStack() < MaxStackParam; }
 private:
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
@@ -82,6 +80,7 @@ struct FInvContainer : public FFastArraySerializer
 	// FFastArraySerializer contract
 	void PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize);
 	void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize);
+	void PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize);
 	// End of FFastArraySerializer contract
 
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParam)
@@ -92,7 +91,7 @@ struct FInvContainer : public FFastArraySerializer
 public:
 	void SetOwner(UActorComponent* InOwner) { OwnerComponent = InOwner; }
 	int32 GetNum() const { return Entries.Num(); }
-	const TArray<FInv_InventoryEntry>& GetEntries() const { return Entries; }
+	TArray<FInv_InventoryEntry>& GetEntries(){ return Entries; }
 	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
 	int32 FindIndexByInstance(const FGuid& InstanceId) const;
 	FInv_InventoryEntry* FindEntryMutableByInstance(const FGuid& InstanceId);

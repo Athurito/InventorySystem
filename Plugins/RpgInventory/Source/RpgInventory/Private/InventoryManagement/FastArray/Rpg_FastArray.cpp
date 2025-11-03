@@ -6,6 +6,12 @@
 #include "Items/Rpg_ItemDefinition.h"
 
 
+void FInv_InventoryEntry::SetStack(const int32 NewStack)
+{
+	// RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment, [&](FStackableRuntimeData& D){ D.CurrentStackCount = NewStack; });
+	RuntimeData.SetValue(FragmentTags::StackableFragment, FStackableRuntimeData{.CurrentStackCount = NewStack});
+}
+
 void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize)
 {
 	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
@@ -17,7 +23,18 @@ void FInvContainer::PreReplicatedRemove(const TArrayView<int32> RemovedIndices, 
 
 	for (int32 const Index : RemovedIndices)
 	{
-		InventoryComponent->OnItemRemoved.Broadcast(Entries[Index]);
+		InventoryComponent->OnEntryChanged.Broadcast(Entries[Index].GetInstanceId(), Entries[Index]);
+	}
+}
+
+void FInvContainer::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
+{
+	const TObjectPtr<URpg_ContainerComponent> InventoryComponent = Cast<URpg_ContainerComponent>(OwnerComponent);
+	if (!InventoryComponent) return;
+
+	for (int32 const Index : ChangedIndices)
+	{
+		InventoryComponent->OnEntryChanged.Broadcast(Entries[Index].GetInstanceId(), Entries[Index]);
 	}
 }
 
@@ -32,7 +49,7 @@ void FInvContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int3
 
 	for (int32 const Index : AddedIndices)
 	{
-		InventoryComponent->OnItemAdded.Broadcast(Entries[Index]);
+		InventoryComponent->OnEntryChanged.Broadcast(Entries[Index].GetInstanceId(), Entries[Index]);
 	}
 }
 
@@ -92,6 +109,13 @@ bool FInvContainer::SwapEntriesByIndex(int32 IndexA, FInvContainer& Other, int32
 		return false;
 	}
 	Swap(Entries[IndexA], Other.Entries[IndexB]);
+
+	// NEU: Owner/Instance-Verknüpfung für beide Seiten geradeziehen
+	if (auto* ThisOwner = Cast<URpg_ContainerComponent>(OwnerComponent))
+		Entries[IndexA].SetRuntimeDataOwner(ThisOwner);
+	if (auto* OtherOwner = Cast<URpg_ContainerComponent>(Other.OwnerComponent))
+		Other.Entries[IndexB].SetRuntimeDataOwner(OtherOwner);
+	
 	MarkItemDirty(Entries[IndexA]);
 	Other.MarkItemDirty(Other.Entries[IndexB]);
 	return true;
@@ -135,6 +159,8 @@ int32 FInvContainer::AddOrStack(const FPrimaryAssetId& ItemId, const FGameplayTa
 		NewE.SetInstanceId(FGuid::NewGuid());
 		const int32 ThisStack = FMath::Min(MaxStack, Quantity);
 		NewE.SetStack(ThisStack);
+
+		NewE.SetRuntimeDataOwner(Cast<URpg_ContainerComponent>(OwnerComponent));
 		LastIndex = Entries.Add(NewE);
 		MarkItemDirty(Entries[LastIndex]);
 		Quantity -= ThisStack;
@@ -194,6 +220,7 @@ int32 FInvContainer::AddNewStackExact(const FPrimaryAssetId& ItemId, const FGame
 	NewE.SetItemType(ItemType);
 	NewE.SetInstanceId(FGuid::NewGuid());
 	NewE.SetStack(Quantity);
+	NewE.SetRuntimeDataOwner(Cast<URpg_ContainerComponent>(OwnerComponent));
 	const int32 NewIdx = Entries.Add(NewE);
 	MarkItemDirty(Entries[NewIdx]);
 	OutInstanceId = NewE.GetInstanceId();
@@ -213,6 +240,8 @@ bool FInvContainer::SplitIntoNewEntry(const FGuid& SourceInstanceId, int32 Split
 	NewE.SetItemType(E.GetItemType());
 	NewE.SetInstanceId(FGuid::NewGuid());
 	NewE.SetStack(SplitQty);
+
+	NewE.SetRuntimeDataOwner(Cast<URpg_ContainerComponent>(OwnerComponent));
 
 	const int32 NewIdx = Entries.Add(NewE);
 	MarkItemDirty(Entries[NewIdx]);

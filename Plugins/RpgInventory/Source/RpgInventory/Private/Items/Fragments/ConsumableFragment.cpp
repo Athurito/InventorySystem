@@ -38,13 +38,22 @@ bool FConsumableFragment::ReduceStackAfterUse(FItemRuntimeDataContainer& Runtime
 	{
 		if (const FStackableFragment* Stackable = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
 		{
-			if (auto* S = Runtime.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
+
+			if (auto* S = Runtime.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,[&](FStackableRuntimeData& D)
 			{
-				const int32 Max = FMath::Max(1, Stackable->GetMaxStackSize());
+				const int32 Max  = FMath::Max(1, Stackable->GetMaxStackSize());
 				const int32 Cost = FMath::Max(1, QuantityPerUse) * Uses;
-				S->CurrentStackCount = FMath::Clamp(S->CurrentStackCount - Cost, 0, Max);
-				Runtime.MarkDirty(FragmentTags::StackableFragment);
-				bChanged = true;
+
+				// Optionaler Fallback, falls der Eintrag neu war
+				if (D.CurrentStackCount <= 0)
+				{
+					D.CurrentStackCount = 1;
+				}
+
+				D.CurrentStackCount = FMath::Clamp(D.CurrentStackCount - Cost, 0, Max);
+			}))
+			{
+				bChanged = true;  // Modify gibt != nullptr zurück → es wurde geschrieben & dirty markiert
 			}
 		}
 	}

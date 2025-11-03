@@ -34,51 +34,55 @@ struct RPGINVENTORY_API FItemRuntimeDataContainer : public FFastArraySerializer
 	UPROPERTY()
 	TArray<FItemRuntimeEntry> Entries;
 
-	// Find a mutable pointer to the struct of type T stored under Key
+
+	// Neu: Owner-Kontext
+	UPROPERTY(Transient) TObjectPtr<class URpg_ContainerComponent> OwnerComponent = nullptr;
+	UPROPERTY(Transient) FGuid OwnerInstanceId; // die Instanz, zu der diese RuntimeData gehört
+
+	// ... bestehende Methoden ...
+
+	// Neu: Delta-Callbacks
+	void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize);
+	void PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize);
+	void PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize);
+	
+	void CopyFrom(const FItemRuntimeDataContainer& Src);
+
+	// Setzt den Wert exakt (kopiert hinein) und markiert dirty
 	template<typename T>
-	T* FindMutable(const FGameplayTag& Key)
+	T* SetValue(const FGameplayTag& Key, const T& NewValue)
 	{
-		FItemRuntimeEntry* Found = Entries.FindByPredicate([&](const FItemRuntimeEntry& E){ return E.Key == Key; });
-		return Found ? &Found->Data.GetMutable<T>() : static_cast<T*>(nullptr);
+		// erzeugt oder findet, markiert beim Anlegen bereits array+item dirty
+		T* Ptr = FindOrAddMutable<T>(Key);
+		if (!Ptr) return nullptr;
+
+		if (!std::is_trivially_copy_assignable<T>::value || *Ptr != NewValue)
+		{
+			*Ptr = NewValue;
+			MarkDirty(Key); // << garantiert Item-Delta
+		}
+		return Ptr;
 	}
 
-	// Find a const pointer to the struct of type T stored under Key
+	// Führt eine Mutation per Lambda aus und markiert immer dirty
+	template<typename T, typename Fn>
+	T* Modify(const FGameplayTag& Key, Fn&& Mutate)
+	{
+		T* Ptr = FindOrAddMutable<T>(Key);
+		if (!Ptr) return nullptr;
+		Mutate(*Ptr);
+		MarkDirty(Key); // << garantiert Item-Delta
+		return Ptr;
+	}
+
 	template<typename T>
 	const T* FindConst(const FGameplayTag& Key) const
 	{
 		const FItemRuntimeEntry* Found = Entries.FindByPredicate([&](const FItemRuntimeEntry& E){ return E.Key == Key; });
 		return Found ? &Found->Data.Get<T>() : static_cast<const T*>(nullptr);
 	}
-
-	// Create or return the existing struct of type T under Key
-	template<typename T>
-	T* FindOrAddMutable(const FGameplayTag& Key)
-	{
-		if (T* Existing = FindMutable<T>(Key))
-		{
-			return Existing;
-		}
-		MarkArrayDirty();
-		FItemRuntimeEntry& NewEntry = Entries.AddDefaulted_GetRef();
-		NewEntry.Key = Key;
-		NewEntry.Data.InitializeAs<T>();
-		MarkItemDirty(NewEntry);
-		return &NewEntry.Data.GetMutable<T>();
-	}
-
 	// Remove an entry by key
-	bool RemoveByKey(const FGameplayTag& Key)
-	{
-		int32 Index = Entries.IndexOfByPredicate([&](const FItemRuntimeEntry& E){ return E.Key == Key; });
-		if (Index != INDEX_NONE)
-		{
-			FItemRuntimeEntry& Entry = Entries[Index];
-			Entries.RemoveAt(Index);
-			MarkItemDirty(Entry);
-			return true;
-		}
-		return false;
-	}
+	bool RemoveByKey(const FGameplayTag& Key);
 
 	// Mark an entry as dirty to trigger replication
 	void MarkDirty(const FGameplayTag& Key)
@@ -91,7 +95,24 @@ struct RPGINVENTORY_API FItemRuntimeDataContainer : public FFastArraySerializer
 
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
 	{
-		return FFastArraySerializer::FastArrayDeltaSerialize(Entries, DeltaParms, *this);
+		return FastArrayDeltaSerialize(Entries, DeltaParms, *this);
+	}
+
+private:
+	// Create or return the existing struct of type T under Key
+	template<typename T>
+	T* FindOrAddMutable(const FGameplayTag& Key)
+	{
+		if (FItemRuntimeEntry* Found = Entries.FindByPredicate([&](const FItemRuntimeEntry& E){ return E.Key == Key; }))
+		{
+			return &Found->Data.GetMutable<T>();
+		}
+		MarkArrayDirty();
+		FItemRuntimeEntry& NewEntry = Entries.AddDefaulted_GetRef();
+		NewEntry.Key = Key;
+		NewEntry.Data.InitializeAs<T>();
+		MarkItemDirty(NewEntry);
+		return &NewEntry.Data.GetMutable<T>();
 	}
 };
 

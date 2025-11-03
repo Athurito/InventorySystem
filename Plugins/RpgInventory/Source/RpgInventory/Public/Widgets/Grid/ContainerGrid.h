@@ -42,17 +42,24 @@ protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 
-	UFUNCTION()
-	void HandleItemAdded(FInv_InventoryEntry Item);
-	UFUNCTION()
-	void HandleItemRemoved(FInv_InventoryEntry Item);
-
 private:
 	void CacheFromDefinition();
 	void RebuildGrid();
-	void UnbindFromCurrent();
+	void UnbindFromCurrent() const;
 	void BindDelegates();
 
+	// Neu: Cache der Slot-Widgets nach Index
+	UPROPERTY()
+	TArray<TObjectPtr<UContainerSlotButton>> SlotWidgets;
+
+	// Neu: Handler für präzise Slot-Änderungen (Delegate aus Component)
+	UFUNCTION()
+	void HandleSlotChanged(int32 ContainerIdx, int32 SlotIdx, FGuid InstanceId);
+
+	// Neu: Hilfsfunktion für 1-Slot-Update
+	void UpdateOneSlot(int32 SlotIdx);
+	
+	
 	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
 	int32 ContainerIndex = INDEX_NONE;
 	int32 CachedRows = 0;

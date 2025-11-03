@@ -58,15 +58,23 @@ protected:
 public:
 	// Runtime data access helpers keyed by fragment tag
 	template<typename T>
-	T* GetMutableFragmentData(const FGameplayTag& Key)
+	const T* GetFragmentDataConst(const FGameplayTag& Key) const
 	{
-		return RuntimeData.FindMutable<T>(Key);
+		return RuntimeData.FindConst<T>(Key);
 	}
 
-	template<typename T>
-	T* GetOrCreateMutableFragmentData(const FGameplayTag& Key)
+	// Mutieren per Lambda; erzeugt bei Bedarf und markiert immer dirty
+	template<typename T, typename Fn>
+	T* ModifyFragmentData(const FGameplayTag& Key, Fn&& Mutate)
 	{
-		return RuntimeData.FindOrAddMutable<T>(Key);
+		return RuntimeData.Modify<T>(Key, Forward<Fn>(Mutate));
+	}
+
+	// Wert vollständig setzen; erzeugt bei Bedarf und markiert immer dirty
+	template<typename T>
+	T* SetFragmentData(const FGameplayTag& Key, const T& NewValue)
+	{
+		return RuntimeData.SetValue<T>(Key, NewValue);
 	}
 
 private:

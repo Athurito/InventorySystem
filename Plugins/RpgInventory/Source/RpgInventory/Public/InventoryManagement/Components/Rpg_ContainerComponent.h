@@ -9,6 +9,8 @@
 #include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
 
+struct FInvSlotArray;
+
 USTRUCT(BlueprintType)
 struct FInventoryDragPayload
 {
@@ -56,7 +58,10 @@ struct FInvContainerEntry
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemConsumedSignature, URpg_ItemComponent*, ItemComponent, int32, QuantityUsed);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryItemChange, FInv_InventoryEntry, Item);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnSlotChanged, int32, ContainerIndex, int32, SlotIndex, FGuid, InstanceId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEntryChanged, FGuid, InstanceId, const FInv_InventoryEntry&, Entry);
+
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
@@ -66,6 +71,28 @@ class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
 public:
 	URpg_ContainerComponent();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+
+
+
+
+
+	// Präzises UI-Signal pro Slot
+	UPROPERTY(BlueprintAssignable, Category="Inventory|Container")
+	FOnSlotChanged OnSlotChanged;
+
+	// Präzises UI-Signal pro Slot
+	UPROPERTY(BlueprintAssignable, Category="Inventory|Container")
+	FOnEntryChanged OnEntryChanged;
+
+	// Replizierte Slot-Zustände (parallel zu Containers)
+	UPROPERTY(ReplicatedUsing=OnRep_Slots)
+	TArray<FInvSlotArray> Slots;
+
+	// UI-Broadcast-Hook (ruft OnSlotChanged mit ContainerIndex zurück)
+	void BroadcastSlotChangedForOwner(const FInvSlotArray* OwnerArray, int32 SlotIndex, const FGuid& InstanceId);
+
+
 	
 
 	// Initial Container-Defs (im Editor/Blueprint setzen)
@@ -156,32 +183,24 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Consume")
 	FOnItemConsumedSignature OnItemConsumed;
 	
-	UPROPERTY(BlueprintAssignable, Category = "Inventory|Container")
-	FInventoryItemChange OnItemAdded;
-	UPROPERTY(BlueprintAssignable, Category = "Inventory|Container")
-	FInventoryItemChange OnItemRemoved;
-
-	
-	UPROPERTY()
-	TMap<int32, FContainerSlotMap> ContainerSlotMaps; // Key = ContainerIndex
-
 	// Helper:
 	const FInv_InventoryEntry* GetEntryBySlot(int32 ContainerIdx, int32 SlotIdx) const;
 	FInv_InventoryEntry* GetEntryBySlotMutable(int32 ContainerIdx, int32 SlotIdx);
-	void EnsureSlotMapSize(int32 ContainerIdx, int32 TotalSlots);
-	void ClearSlot(int32 ContainerIdx, int32 SlotIdx);
-	FGuid GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const;
-
-	void AssignInstanceToSlotUnique(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
-
-	void ReconcileMappingFromEntries(int32 ContainerIdx);
-	void ClearMappingForInstance(int32 ContainerIdx, const FGuid& InstanceId);
-		
+	
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
 	bool InternalUseItem_Inventory(int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity);
 	bool InternalUseItem_World(URpg_ItemComponent* ItemComponent, int32 Quantity);
+
+	UFUNCTION()
+	void OnRep_Slots();
+	void InitSlotsArrayFromContainers(); // initiales Setup/Resize & Owner setzen
+
+	// Slot Helpers
+	FGuid GetSlotInstance(int32 ContainerIdx, int32 SlotIdx) const;
+	void SetSlotInstance(int32 ContainerIdx, int32 SlotIdx, const FGuid& InstanceId);
+	void ClearSlot(int32 ContainerIdx, int32 SlotIdx);
 
 	virtual void BeginPlay() override;
 private:
@@ -207,6 +226,8 @@ private:
 	int32 TargetContainerIndex,
 	int32 TargetSlotIndex,
 	int32& OutMoved);
+
+	int32 FindFirstFreeSlot(int32 ContainerIdx) const;
 
 	UFUNCTION()
 	void OnRep_Containers();
