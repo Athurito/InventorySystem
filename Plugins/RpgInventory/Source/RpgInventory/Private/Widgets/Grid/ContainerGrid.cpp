@@ -13,6 +13,7 @@ void UContainerGrid::BindDelegates()
 	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
 	{
 		Comp->OnSlotChanged.AddDynamic(this, &UContainerGrid::HandleSlotChanged);
+		Comp->OnEntryChanged.AddDynamic(this, &UContainerGrid::HandleEntryChanged);
 	}
 }
 
@@ -57,6 +58,16 @@ void UContainerGrid::UnbindFromCurrent() const
 	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
 	{
 		Comp->OnSlotChanged.RemoveAll(this);
+		Comp->OnEntryChanged.RemoveAll(this);
+	}
+}
+
+void UContainerGrid::HandleEntryChanged(FGuid InstanceId, const FInv_InventoryEntry& Entry)
+{
+	int32 SlotIdx;
+	if (ContainerComponent->FindSlotIndexByInstanceId(ContainerIndex, InstanceId, SlotIdx))
+	{
+		UpdateOneSlot(SlotIdx);
 	}
 }
 

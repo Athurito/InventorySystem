@@ -46,6 +46,8 @@ private:
 	void CacheFromDefinition();
 	void RebuildGrid();
 	void UnbindFromCurrent() const;
+	UFUNCTION()
+	void HandleEntryChanged(FGuid InstanceId, const FInv_InventoryEntry& Entry);
 	void BindDelegates();
 
 	// Neu: Cache der Slot-Widgets nach Index

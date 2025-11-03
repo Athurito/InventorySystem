@@ -57,7 +57,7 @@ void FInvContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int3
 bool FInvContainer::IsItemAllowed(const FGameplayTag& ItemTag) const
 {
 	// Empty query means allow everything (e.g., generic storage)
- if (AllowedItems.IsEmpty())
+	if (AllowedItems.IsEmpty())
 	{
 		return true;
 	}

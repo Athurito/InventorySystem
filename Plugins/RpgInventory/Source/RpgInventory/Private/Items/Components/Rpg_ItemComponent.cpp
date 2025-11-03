@@ -115,15 +115,17 @@ void URpg_ItemComponent::InitRuntimeFromDefinition(const URpg_ItemDefinition* De
 		if (const FStackableFragment* Stack = Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment))
 		{
 			const int32 Max = FMath::Max(1, Stack->GetMaxStackSize());
-			if (FStackableRuntimeData* StackData = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
-			{
-				if (StackData->CurrentStackCount <= 0)
+
+			RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
+				[&](FStackableRuntimeData& D)
 				{
-					StackData->CurrentStackCount = 1;
-				}
-				StackData->CurrentStackCount = FMath::Clamp(StackData->CurrentStackCount, 1, Max);
-				RuntimeData.MarkDirty(FragmentTags::StackableFragment);
-			}
+					// Mindestwert 1 beim Initialisieren (dein bisheriges Verhalten)
+					if (D.CurrentStackCount <= 0)
+					{
+						D.CurrentStackCount = 1;
+					}
+					D.CurrentStackCount = FMath::Clamp(D.CurrentStackCount, 1, Max);
+				});
 		}
 	}
 }
@@ -151,21 +153,30 @@ bool URpg_ItemComponent::Consume(APawn* Instigator)
 	// Check runtime stack if required
 	if (Consumable->bReduceStack)
 	{
-		int32 Max = GetMaxStackSize();
-		FStackableRuntimeData* StackData = RuntimeData.FindMutable<FStackableRuntimeData>(FragmentTags::StackableFragment);
-		int32 Current = StackData ? StackData->CurrentStackCount : 1;
+		const int32 Max = GetMaxStackSize();
+
+		// Lesen: ohne Anlegen
+		const FStackableRuntimeData* StackConst =
+			RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
+
+		int32 Current = StackConst ? StackConst->CurrentStackCount : 1;
+
 		if (Current < Consumable->QuantityPerUse)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"), Current, Consumable->QuantityPerUse);
+			UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"),
+				   Current, Consumable->QuantityPerUse);
 			return false;
 		}
-		Current = FMath::Clamp(Current - Consumable->QuantityPerUse, 0, Max);
-		if (!StackData)
-		{
-			StackData = RuntimeData.FindOrAddMutable<FStackableRuntimeData>(FragmentTags::StackableFragment);
-		}
-		StackData->CurrentStackCount = Current;
-		RuntimeData.MarkDirty(FragmentTags::StackableFragment);
+
+		const int32 NewCurrent =
+			FMath::Clamp(Current - Consumable->QuantityPerUse, 0, Max);
+
+		// Schreiben: legt bei Bedarf an und markiert automatisch dirty
+		RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
+			[&](FStackableRuntimeData& D)
+			{
+				D.CurrentStackCount = NewCurrent;
+			});
 	}
 
 	// Durability not implemented yet in this module; log if requested
@@ -311,27 +322,40 @@ void URpg_ItemComponent::Interact_Implementation(APawn* Instigator)
 	{
 		if (OutAdded > 0)
 		{
-			if (FStackableRuntimeData* StackData = RuntimeData.FindMutable<FStackableRuntimeData>(FragmentTags::StackableFragment))
+			AActor* OwnerActor = GetOwner();
+			const bool bIsStackable =
+				(Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment) != nullptr);
+
+			if (bIsStackable)
 			{
-				StackData->CurrentStackCount = FMath::Max(0, StackData->CurrentStackCount - OutAdded);
-				RuntimeData.MarkDirty(FragmentTags::StackableFragment);
-				if (StackData->CurrentStackCount <= 0)
-				{
-					if (AActor* OwnerActor = GetOwner())
+				// Aktuellen Wert nur lesen (legt nichts an)
+				const FStackableRuntimeData* StackConst =
+					RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
+
+				// Fallback: wenn noch kein RuntimeData existiert, verhalte dich wie „1 vor Abzug“
+				const int32 Current = StackConst ? StackConst->CurrentStackCount : 1;
+				const int32 NewCount = FMath::Max(0, Current - OutAdded);
+
+				bool bBecameZero = false;
+				// Schreiben: legt bei Bedarf an + markiert automatisch dirty
+				RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
+					[&](FStackableRuntimeData& D)
 					{
-						OwnerActor->Destroy();
-					}
+						D.CurrentStackCount = NewCount;
+						bBecameZero = (D.CurrentStackCount <= 0);
+					});
+
+				if (bBecameZero && OwnerActor)
+				{
+					OwnerActor->Destroy();
 				}
 			}
 			else
 			{
-				// Non-stackable or no stack runtime data: if anything was added, just destroy the actor
-				if (Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment) == nullptr)
+				// Non-stackable: sobald etwas entnommen wurde, Actor zerstören
+				if (OwnerActor)
 				{
-					if (AActor* OwnerActor = GetOwner())
-					{
-						OwnerActor->Destroy();
-					}
+					OwnerActor->Destroy();
 				}
 			}
 		}

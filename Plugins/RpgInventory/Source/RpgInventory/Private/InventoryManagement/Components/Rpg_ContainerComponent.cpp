@@ -128,6 +128,37 @@ FInv_InventoryEntry* URpg_ContainerComponent::GetEntryBySlotMutable(int32 Contai
 	return Containers[ContainerIdx].FindEntryMutableByInstance(Id);
 }
 
+bool URpg_ContainerComponent::FindSlotIndexByInstanceId(int32 ContainerIdx, const FGuid& InstanceId,
+	int32& OutSlotIdx) const
+{
+	OutSlotIdx = INDEX_NONE;
+	if (!Slots.IsValidIndex(ContainerIdx)) return false;
+	const auto& Arr = Slots[ContainerIdx].Items;
+	for (int32 i=0;i<Arr.Num();++i)
+	{
+		if (Arr[i].InstanceId == InstanceId) { OutSlotIdx = i; return true; }
+	}
+	return false;
+}
+
+void URpg_ContainerComponent::EnsureSlotsInitializedFor(URpg_ContainerComponent* Self, int32 ContainerIdx)
+{
+	if (!Self->Containers.IsValidIndex(ContainerIdx)) return;
+	if (Self->Slots.Num() < Self->Containers.Num())
+		Self->Slots.SetNum(Self->Containers.Num());
+
+	auto& Arr = Self->Slots[ContainerIdx];
+	Arr.OwnerComponent = Self;
+
+	const int32 Total = Self->Containers[ContainerIdx].Rows * Self->Containers[ContainerIdx].Cols;
+	if (Arr.Items.Num() != Total)
+	{
+		Arr.Init(Total);
+		Arr.MarkArrayDirty();
+	}
+	
+}
+
 
 void URpg_ContainerComponent::ClearSlot(int32 ContainerIdx, int32 SlotIdx)
 {
@@ -138,6 +169,7 @@ void URpg_ContainerComponent::ClearSlot(int32 ContainerIdx, int32 SlotIdx)
 	{
 		Arr.Items[SlotIdx].InstanceId.Invalidate();
 		Arr.MarkItemDirty(Arr.Items[SlotIdx]);
+		OnSlotChanged.Broadcast(ContainerIdx, SlotIdx, FGuid());
 	}
 }
 
@@ -250,31 +282,28 @@ void URpg_ContainerComponent::InitSlotsArrayFromContainers()
 	{
 		auto& SlotArray = Slots[c];
 		SlotArray.OwnerComponent = this;
-		// SlotArray.OwnerContainerIndex = c; // falls du das Feld nutzt
-
 		const int32 Total = Containers[c].Rows * Containers[c].Cols;
 
-		// Größe initial setzen/angleichen
-		if (SlotArray.Items.Num() != Total)
+		const bool bSizeChanged = (SlotArray.Items.Num() != Total);
+		if (bSizeChanged)
 		{
 			SlotArray.Init(Total);
-			SlotArray.MarkArrayDirty();           // << statt MarkItemDirty(Slots[c])
-		}
+			SlotArray.MarkArrayDirty();
 
-		// deterministische Erstbelegung: Entries 0..N-1 → Slots 0..N-1
-		const TArray<FInv_InventoryEntry>& Es = Containers[c].GetEntries();
-
-		for (int32 s = 0; s < SlotArray.Items.Num(); ++s)
-		{
-			const FGuid NewId = (Es.IsValidIndex(s) ? Es[s].GetInstanceId() : FGuid());
-			FInv_Slot& Slot = SlotArray.Items[s];
-
-			if (Slot.InstanceId != NewId)
+			// Nur beim erstmaligen Anlegen: Initial-Layout 0..N-1
+			const TArray<FInv_InventoryEntry>& Es = Containers[c].GetEntries();
+			for (int32 s = 0; s < SlotArray.Items.Num(); ++s)
 			{
-				Slot.InstanceId = NewId;
-				SlotArray.MarkItemDirty(Slot);     // hier ist MarkItemDirty korrekt (Item!)
+				const FGuid NewId = (Es.IsValidIndex(s) ? Es[s].GetInstanceId() : FGuid());
+				FInv_Slot& Slot = SlotArray.Items[s];
+				if (Slot.InstanceId != NewId)
+				{
+					Slot.InstanceId = NewId;
+					SlotArray.MarkItemDirty(Slot);
+				}
 			}
 		}
+		// Wenn Größe gleich bleibt: NICHT erneut aus Entries „überbügeln“
 	}
 }
 
@@ -291,13 +320,22 @@ void URpg_ContainerComponent::SetSlotInstance(int32 ContainerIdx, int32 SlotIdx,
 	auto& Arr = Slots[ContainerIdx];
 	if (!Arr.Items.IsValidIndex(SlotIdx)) return;
 
-	// Unique pro Container sicherstellen
-	for (FInv_Slot& S : Arr.Items)
+	// 1) Vorherige Vorkommen der gleichen InstanceId in DIESEM Container leeren + broadcasten
+	for (int32 i = 0; i < Arr.Items.Num(); ++i)
 	{
-		if (&S != &Arr.Items[SlotIdx] && S.InstanceId == InstanceId) { S.InstanceId.Invalidate(); Arr.MarkItemDirty(S); }
+		if (i == SlotIdx) continue;
+		if (Arr.Items[i].InstanceId == InstanceId)
+		{
+			Arr.Items[i].InstanceId.Invalidate();
+			Arr.MarkItemDirty(Arr.Items[i]);
+			OnSlotChanged.Broadcast(ContainerIdx, i, FGuid());   // <<< wichtig
+		}
 	}
+
+	// 2) Neue Position setzen + broadcasten
 	Arr.Items[SlotIdx].InstanceId = InstanceId;
 	Arr.MarkItemDirty(Arr.Items[SlotIdx]);
+	OnSlotChanged.Broadcast(ContainerIdx, SlotIdx, InstanceId);  // <<< wichtig
 }
 
 void URpg_ContainerComponent::BeginPlay()
@@ -320,6 +358,26 @@ void URpg_ContainerComponent::BeginPlay()
 		C.AllowedItems = Def->AllowedItems;
 		C.TabIcon      = Def->TabIcon;
 		Containers.Add(MoveTemp(C));
+	}
+
+	// NEU: Owner setzen + RuntimeData-Owner backfill + Slot-Arrays initialisieren
+	for (int32 i = 0; i < Containers.Num(); ++i) { Containers[i].SetOwner(this); }
+	EnsureEntryRuntimeOwners();       // kleine Helper-Funktion, siehe unten
+	InitSlotsArrayFromContainers();   // jetzt auch auf dem SERVER aufrufen
+}
+
+
+void URpg_ContainerComponent::EnsureEntryRuntimeOwners()
+{
+	for (FInvContainer& C : Containers)
+	{
+		for (FInv_InventoryEntry& E : C.GetEntries())
+		{
+			if (E.GetRuntimeData().OwnerComponent != this)
+			{
+				E.SetRuntimeDataOwner(this);
+			}
+		}
 	}
 }
 
@@ -465,6 +523,7 @@ bool URpg_ContainerComponent::InternalAddItem(int32 ContainerIndex, URpg_ItemCom
 		}
 
 		// Positionieren: ersten freien Slot wählen und InstanceId eintragen.
+		EnsureSlotsInitializedFor(this, ContainerIndex);  
 		const int32 TargetSlot = FindFirstFreeSlot(ContainerIndex);
 		if (TargetSlot != INDEX_NONE)
 		{

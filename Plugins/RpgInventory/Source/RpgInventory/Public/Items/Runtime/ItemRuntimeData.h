@@ -48,18 +48,18 @@ struct RPGINVENTORY_API FItemRuntimeDataContainer : public FFastArraySerializer
 	
 	void CopyFrom(const FItemRuntimeDataContainer& Src);
 
-	// Setzt den Wert exakt (kopiert hinein) und markiert dirty
 	template<typename T>
-	T* SetValue(const FGameplayTag& Key, const T& NewValue)
+	T* SetValue(const FGameplayTag& KeyTag, const T& NewValue)
 	{
-		// erzeugt oder findet, markiert beim Anlegen bereits array+item dirty
-		T* Ptr = FindOrAddMutable<T>(Key);
+		T* Ptr = FindOrAddMutable<T>(KeyTag);   // legt an und markiert Array/Item dirty beim Anlegen
 		if (!Ptr) return nullptr;
 
-		if (!std::is_trivially_copy_assignable<T>::value || *Ptr != NewValue)
+		*Ptr = NewValue;                     // immer schreiben
+		// Item erneut explizit dirty markieren, damit ein Delta sicher rausgeht
+		if (FItemRuntimeEntry* Found = Entries.FindByPredicate(
+				[&](const FItemRuntimeEntry& E){ return E.Key == KeyTag; }))
 		{
-			*Ptr = NewValue;
-			MarkDirty(Key); // << garantiert Item-Delta
+			MarkItemDirty(*Found);
 		}
 		return Ptr;
 	}

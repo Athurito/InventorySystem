@@ -91,6 +91,7 @@ struct FInvContainer : public FFastArraySerializer
 public:
 	void SetOwner(UActorComponent* InOwner) { OwnerComponent = InOwner; }
 	int32 GetNum() const { return Entries.Num(); }
+	const TArray<FInv_InventoryEntry>& GetEntries() const{ return Entries; }
 	TArray<FInv_InventoryEntry>& GetEntries(){ return Entries; }
 	bool IsItemAllowed(const FGameplayTag& ItemTag) const;
 	int32 FindIndexByInstance(const FGuid& InstanceId) const;

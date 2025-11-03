@@ -4,6 +4,7 @@
 #include "Items/Components/Rpg_ItemComponent.h"
 #include "Items/Runtime/ItemRuntimeData.h"
 #include "Items/Fragments/Rpg_FragmentTags.h"
+#include "Items/Fragments/StackableFragment.h"
 
 bool UInventoryBlueprintLibrary::ConsumeStackByInstance(URpg_ContainerComponent* Container, int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutConsumed)
 {
@@ -36,23 +37,25 @@ bool UInventoryBlueprintLibrary::ConsumeStackByInstance(URpg_ContainerComponent*
 bool UInventoryBlueprintLibrary::ConsumeWorldItemStack(URpg_ItemComponent* ItemComponent, int32 Quantity, int32& OutConsumed)
 {
 	OutConsumed = 0;
-	if (!ItemComponent || Quantity <= 0)
-	{
-		return false;
-	}
-	AActor* Owner = ItemComponent->GetOwner();
-	if (!Owner || !Owner->HasAuthority())
-	{
-		return false;
-	}
+	if (!ItemComponent || Quantity <= 0) return false;
 
-	// Reduce stack in the item's runtime data
-	FItemRuntimeDataContainer const& ConstRuntime = ItemComponent->GetRuntimeData();
+	AActor* Owner = ItemComponent->GetOwner();
+	if (!Owner || !Owner->HasAuthority()) return false;
+
+	// Optional: über Definition prüfen, ob überhaupt stackable
+	const URpg_ItemDefinition* Def = ItemComponent->GetItemDefinition();
+	const bool bIsStackable = (Def && Def->GetFragmentOfTypeWithTag<FStackableFragment>(FragmentTags::StackableFragment) != nullptr);
+
+	// Zugriff auf RuntimeData (non-const wäre besser; sonst const_cast)
+	const FItemRuntimeDataContainer& ConstRuntime = ItemComponent->GetRuntimeData();
 	FItemRuntimeDataContainer& Runtime = const_cast<FItemRuntimeDataContainer&>(ConstRuntime);
-	FStackableRuntimeData* StackData = Runtime.FindMutable<FStackableRuntimeData>(FragmentTags::StackableFragment);
-	if (!StackData)
+
+	// Aktuellen Stack nur lesen (legt nichts an)
+	const FStackableRuntimeData* StackConst = Runtime.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
+
+	if (!bIsStackable || !StackConst)
 	{
-		// Non-stackable items: treat as single use
+		// Non-stackable oder kein Laufzeit-Stack vorhanden → 1x konsumieren und zerstören
 		OutConsumed = 1;
 		if (AActor* OwnerActor = ItemComponent->GetOwner())
 		{
@@ -61,17 +64,24 @@ bool UInventoryBlueprintLibrary::ConsumeWorldItemStack(URpg_ItemComponent* ItemC
 		return true;
 	}
 
-	const int32 Before = StackData->CurrentStackCount;
-	if (Before <= 0)
-	{
-		return false;
-	}
+	const int32 Before = StackConst->CurrentStackCount;
+	if (Before <= 0) return false;
+
 	const int32 ToConsume = FMath::Clamp(Quantity, 0, Before);
-	StackData->CurrentStackCount = Before - ToConsume;
-	Runtime.MarkDirty(FragmentTags::StackableFragment);
+	const int32 After     = Before - ToConsume;
+
+	// Schreiben: legt bei Bedarf an und markiert automatisch dirty
+	bool bNowZero = false;
+	Runtime.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
+		[&](FStackableRuntimeData& D)
+		{
+			D.CurrentStackCount = After;
+			bNowZero = (D.CurrentStackCount <= 0);
+		});
+
 	OutConsumed = ToConsume;
 
-	if (StackData->CurrentStackCount <= 0)
+	if (bNowZero)
 	{
 		if (AActor* OwnerActor = ItemComponent->GetOwner())
 		{

@@ -186,7 +186,9 @@ public:
 	// Helper:
 	const FInv_InventoryEntry* GetEntryBySlot(int32 ContainerIdx, int32 SlotIdx) const;
 	FInv_InventoryEntry* GetEntryBySlotMutable(int32 ContainerIdx, int32 SlotIdx);
-	
+
+	bool FindSlotIndexByInstanceId(int32 ContainerIdx, const FGuid& InstanceId, int32& OutSlotIdx) const;
+	static void EnsureSlotsInitializedFor(URpg_ContainerComponent* Self, int32 ContainerIdx);
 	void AddRepSubObject(UObject* SubObject);
 protected:
 	bool InternalConsume(URpg_ItemComponent* ItemComponent, const int32 Quantity) const;
@@ -203,6 +205,8 @@ protected:
 	void ClearSlot(int32 ContainerIdx, int32 SlotIdx);
 
 	virtual void BeginPlay() override;
+	void EnsureEntryRuntimeOwners();
+
 private:
 
 
