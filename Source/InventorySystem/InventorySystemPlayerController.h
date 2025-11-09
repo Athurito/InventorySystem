@@ -47,7 +47,7 @@ protected:
 	TSubclassOf<AActor> DropClass;
 
 	UPROPERTY(EditAnywhere, Category="Test")
-	TSoftObjectPtr<class URpg_ItemDefinition> TestDefinition;
+	TSoftObjectPtr<class UInventoryItemDefinition> TestDefinition;
 
 	UFUNCTION(Server, Reliable)
 	void ServerSpawnTestItem();

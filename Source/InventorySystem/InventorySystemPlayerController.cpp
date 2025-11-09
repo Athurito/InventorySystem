@@ -97,7 +97,7 @@ void AInventorySystemPlayerController::ServerSpawnTestItem_Implementation()
 		// Variante 1 – über SoftReference
 		if (TestDefinition.IsValid() || !TestDefinition.ToSoftObjectPath().IsNull())
 		{
-			URpg_ItemDefinition* Def = TestDefinition.IsValid() ? TestDefinition.Get() : TestDefinition.LoadSynchronous();
+			UInventoryItemDefinition* Def = TestDefinition.IsValid() ? TestDefinition.Get() : TestDefinition.LoadSynchronous();
 			ItemComp->InitItemByDefinition(Def);
 		}
 		else
