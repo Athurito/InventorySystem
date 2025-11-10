@@ -2,7 +2,7 @@
 
 #include "InventoryFragment_Stackable.h"
 
-bool FInventoryFragment_Consumable::AllowsContext(EUseContext Ctx) const
+bool UInventoryFragment_Consumable::AllowsContext(EUseContext Ctx) const
 {
 	switch (UseAvailability)
 	{
@@ -14,7 +14,7 @@ bool FInventoryFragment_Consumable::AllowsContext(EUseContext Ctx) const
 	return false;
 }
 
-bool FInventoryFragment_Consumable::PreflightCanUse(const FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def) const
+bool UInventoryFragment_Consumable::PreflightCanUse(const FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def) const
 {
 	if (!Def) return false;
 	if (bReduceStack)
@@ -27,7 +27,7 @@ bool FInventoryFragment_Consumable::PreflightCanUse(const FItemRuntimeDataContai
 	return true;
 }
 
-bool FInventoryFragment_Consumable::ReduceStackAfterUse(FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def, int32 Uses) const
+bool UInventoryFragment_Consumable::ReduceStackAfterUse(FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def, int32 Uses) const
 {
 	bool bChanged = false;
 	Uses = FMath::Max(0, Uses);

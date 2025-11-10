@@ -28,8 +28,8 @@ enum class EUseAvailability : uint8 {
 /**
  * Consumable rules and effect definition
  */
-USTRUCT(BlueprintType)
-struct FInventoryFragment_Consumable : public UInventoryItemFragment
+UCLASS()
+class UInventoryFragment_Consumable : public UInventoryItemFragment
 {
 	GENERATED_BODY()
 

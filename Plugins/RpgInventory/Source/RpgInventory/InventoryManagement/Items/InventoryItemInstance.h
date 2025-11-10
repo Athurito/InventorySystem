@@ -6,12 +6,10 @@
 #include "GameplayTagContainer.h"
 #include "GameplayTagStack.h"
 #include "InventoryItemInstance.h"
-#include "InventoryItemInstance.h"
-#include "InventoryItemInstance.h"
-#include "Net/Serialization/FastArraySerializer.h"
 #include "UObject/Object.h"
 #include "InventoryItemInstance.generated.h"
 
+class UInventoryItemFragment;
 class UInventoryItemDefinition;
 struct FGameplayTag;
 /**
@@ -45,6 +43,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category=Inventory)
 	bool HasStatTag(FGameplayTag Tag) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure=false, meta=(DeterminesOutputType=FragmentClass))
+	const UInventoryItemFragment* FindFragmentByClass(TSubclassOf<UInventoryItemFragment> FragmentClass) const;
+
+	template <typename ResultClass>
+	const ResultClass* FindFragmentByClass() const
+	{
+		return static_cast<ResultClass*>(FindFragmentByClass(ResultClass::StaticClass()));
+	}
+
 
 private:
 	UPROPERTY(Replicated)
@@ -53,4 +60,6 @@ private:
 	// The item definition
 	UPROPERTY(Replicated)
 	TSubclassOf<UInventoryItemDefinition> ItemDef;
+
+	void SetItemDef(TSubclassOf<UInventoryItemDefinition> InDef);
 };

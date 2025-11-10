@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Net/Serialization/FastArraySerializer.h"
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
@@ -75,3 +76,8 @@ protected:
 private:
 	
 };
+
+
+
+
+
