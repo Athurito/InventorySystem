@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Net/Serialization/FastArraySerializer.h"
+#include "InventoryItemList.generated.h"
 
 class UInventoryItemDefinition;
 struct FInventoryList;
@@ -55,6 +56,9 @@ private:
 
 	UPROPERTY(NotReplicated)
 	int32 LastObservedCount = INDEX_NONE;
+
+	UPROPERTY()
+	int32 SlotIndex = INDEX_NONE;
 };
 
 /** List of inventory items */

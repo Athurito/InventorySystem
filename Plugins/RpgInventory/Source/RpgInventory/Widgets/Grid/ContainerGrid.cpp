@@ -2,9 +2,6 @@
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
-#include "RpgInventory/InventoryManagement/FastArray/Rpg_FastArray.h"
-#include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
-#include "RpgInventory/Items/InventoryItemDefinition.h"
 #include "RpgInventory/Widgets/GridSlots/ContainerSlotButton.h"
 
 
@@ -12,8 +9,8 @@ void UContainerGrid::BindDelegates()
 {
 	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
 	{
-		Comp->OnSlotChanged.AddDynamic(this, &UContainerGrid::HandleSlotChanged);
-		Comp->OnEntryChanged.AddDynamic(this, &UContainerGrid::HandleEntryChanged);
+		// Comp->OnSlotChanged.AddDynamic(this, &UContainerGrid::HandleSlotChanged);
+		// Comp->OnEntryChanged.AddDynamic(this, &UContainerGrid::HandleEntryChanged);
 	}
 }
 
@@ -26,49 +23,49 @@ void UContainerGrid::HandleSlotChanged(int32 ContainerIdx, int32 SlotIdx, FGuid 
 
 void UContainerGrid::UpdateOneSlot(int32 SlotIdx)
 {
-	if (!ContainerComponent.IsValid()) return;
-	if (!SlotWidgets.IsValidIndex(SlotIdx)) return;
-
-	UContainerSlotButton* SlotWidget = SlotWidgets[SlotIdx];
-	if (!SlotWidget) return;
-
-	// Entry anhand Slot ermitteln
-	const FInv_InventoryEntry* EntryPtr = ContainerComponent->GetEntryBySlot(ContainerIndex, SlotIdx);
-
-	if (EntryPtr)
-	{
-		const FPrimaryAssetId& ItemId = EntryPtr->GetItemId();
-		UInventoryItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(ItemId);
-
-		SlotWidget->SetStackCount(EntryPtr->GetStack());
-		SlotWidget->UpdateIcon(Def ? Def->GetIcon() : nullptr);
-		SlotWidget->UpdateText();
-	}
-	else
-	{
-		// Leerer Slot
-		SlotWidget->SetStackCount(0);
-		SlotWidget->UpdateIcon(nullptr);
-		SlotWidget->UpdateText();
-	}
+	// if (!ContainerComponent.IsValid()) return;
+	// if (!SlotWidgets.IsValidIndex(SlotIdx)) return;
+	//
+	// UContainerSlotButton* SlotWidget = SlotWidgets[SlotIdx];
+	// if (!SlotWidget) return;
+	//
+	// // Entry anhand Slot ermitteln
+	// const FInv_InventoryEntry* EntryPtr = ContainerComponent->GetEntryBySlot(ContainerIndex, SlotIdx);
+	//
+	// if (EntryPtr)
+	// {
+	// 	const FPrimaryAssetId& ItemId = EntryPtr->GetItemId();
+	// 	UInventoryItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(ItemId);
+	//
+	// 	SlotWidget->SetStackCount(EntryPtr->GetStack());
+	// 	SlotWidget->UpdateIcon(Def ? Def->GetIcon() : nullptr);
+	// 	SlotWidget->UpdateText();
+	// }
+	// else
+	// {
+	// 	// Leerer Slot
+	// 	SlotWidget->SetStackCount(0);
+	// 	SlotWidget->UpdateIcon(nullptr);
+	// 	SlotWidget->UpdateText();
+	// }
 }
 
 void UContainerGrid::UnbindFromCurrent() const
 {
-	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
-	{
-		Comp->OnSlotChanged.RemoveAll(this);
-		Comp->OnEntryChanged.RemoveAll(this);
-	}
+	// if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
+	// {
+	// 	Comp->OnSlotChanged.RemoveAll(this);
+	// 	Comp->OnEntryChanged.RemoveAll(this);
+	// }
 }
 
-void UContainerGrid::HandleEntryChanged(FGuid InstanceId, const FInv_InventoryEntry& Entry)
+void UContainerGrid::HandleEntryChanged(FGuid InstanceId, const FInventoryEntry& Entry)
 {
-	int32 SlotIdx;
-	if (ContainerComponent->FindSlotIndexByInstanceId(ContainerIndex, InstanceId, SlotIdx))
-	{
-		UpdateOneSlot(SlotIdx);
-	}
+	// int32 SlotIdx;
+	// if (ContainerComponent->FindSlotIndexByInstanceId(ContainerIndex, InstanceId, SlotIdx))
+	// {
+	// 	UpdateOneSlot(SlotIdx);
+	// }
 }
 
 void UContainerGrid::NativeOnInitialized()
@@ -94,18 +91,18 @@ void UContainerGrid::BindToContainer(URpg_ContainerComponent* InComponent, int32
 
 void UContainerGrid::CacheFromDefinition()
 {
-	CachedRows = 0;
-	CachedCols = 0;
-
-	const URpg_ContainerComponent* Comp = ContainerComponent.Get();
-	if (!Comp || !Comp->Containers.IsValidIndex(ContainerIndex))
-	{
-		return;
-	}
-
-	const FInvContainer& C = Comp->Containers[ContainerIndex];
-	CachedRows = FMath::Max(1, C.Rows);
-	CachedCols = FMath::Max(1, C.Cols);
+	// CachedRows = 0;
+	// CachedCols = 0;
+	//
+	// const URpg_ContainerComponent* Comp = ContainerComponent.Get();
+	// if (!Comp || !Comp->Containers.IsValidIndex(ContainerIndex))
+	// {
+	// 	return;
+	// }
+	//
+	// const FInvContainer& C = Comp->Containers[ContainerIndex];
+	// CachedRows = FMath::Max(1, C.Rows);
+	// CachedCols = FMath::Max(1, C.Cols);
 }
 
 void UContainerGrid::RebuildGrid()

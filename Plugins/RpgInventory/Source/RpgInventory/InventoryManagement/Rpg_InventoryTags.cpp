@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "InventoryManagement/Rpg_InventoryTags.h"
+#include "Rpg_InventoryTags.h"
 
 
 namespace RpgTags

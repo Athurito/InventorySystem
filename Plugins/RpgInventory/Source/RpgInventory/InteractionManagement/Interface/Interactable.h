@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RpgInventory/InteractionManagement/Data/InteractableDataAsset.h"
 #include "UObject/Interface.h"
 #include "Interactable.generated.h"
 

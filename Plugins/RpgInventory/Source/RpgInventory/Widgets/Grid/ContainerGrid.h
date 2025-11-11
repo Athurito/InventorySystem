@@ -4,6 +4,7 @@
 #include "CommonUserWidget.h"
 #include "ContainerGrid.generated.h"
 
+struct FInventoryEntry;
 class UContainerSlotButton;
 class URpg_ContainerComponent;
 class UUniformGridPanel;
@@ -46,7 +47,7 @@ private:
 	void RebuildGrid();
 	void UnbindFromCurrent() const;
 	UFUNCTION()
-	void HandleEntryChanged(FGuid InstanceId, const FInv_InventoryEntry& Entry);
+	void HandleEntryChanged(FGuid InstanceId, const FInventoryEntry& Entry);
 	void BindDelegates();
 
 	// Neu: Cache der Slot-Widgets nach Index

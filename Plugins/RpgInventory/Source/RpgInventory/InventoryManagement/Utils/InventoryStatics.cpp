@@ -6,7 +6,7 @@
 #include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
 #include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
-#include "RpgInventory/Items/InventoryItemDefinition.h"
+#include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 
 
 UInventoryItemDefinition* UInventoryStatics::GetItemDefinitionById(const FPrimaryAssetId& ItemId)
@@ -18,7 +18,7 @@ UInventoryItemDefinition* UInventoryStatics::GetItemDefinitionById(const FPrimar
 		if (Path.IsValid())
 		{
 			UObject* Obj = AM->GetStreamableManager().LoadSynchronous(Path, false);
-			Def = Cast<UInventoryItemDefinition>(Obj);
+			// Def = Cast<UInventoryItemDefinition>(Obj);
 		}
 	}
 	return Def;

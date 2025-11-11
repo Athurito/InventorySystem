@@ -9,7 +9,7 @@
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "InventorySystem.h"
-#include "Items/Components/Rpg_ItemComponent.h"
+#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
 void AInventorySystemPlayerController::BeginPlay()
@@ -92,18 +92,18 @@ void AInventorySystemPlayerController::ServerSpawnTestItem_Implementation()
 	FTransform SpawnTransform(SpawnRotation, Location);
 	
 	AActor* Drop = GetWorld()->SpawnActor<AActor>(DropClass, SpawnTransform);
-	if (auto* ItemComp = Drop->FindComponentByClass<URpg_ItemComponent>())
+	if (auto* ItemComp = Drop->FindComponentByClass<URpg_ContainerComponent>())
 	{
 		// Variante 1 – über SoftReference
 		if (TestDefinition.IsValid() || !TestDefinition.ToSoftObjectPath().IsNull())
 		{
-			UInventoryItemDefinition* Def = TestDefinition.IsValid() ? TestDefinition.Get() : TestDefinition.LoadSynchronous();
-			ItemComp->InitItemByDefinition(Def);
+			// UInventoryItemDefinition* Def = TestDefinition.IsValid() ? TestDefinition.Get() : TestDefinition.LoadSynchronous();
+			// ItemComp->InitItemByDefinition(Def);
 		}
 		else
 		{
 			// Variante 2 – über PrimaryAssetId (automatisch erkannt)
-			ItemComp->InitItemById(FPrimaryAssetId(TEXT("Item"), TEXT("DA_Potion")));
+			// ItemComp->InitItemById(FPrimaryAssetId(TEXT("Item"), TEXT("DA_Potion")));
 		}
 	}
 }

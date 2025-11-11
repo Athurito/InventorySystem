@@ -18,6 +18,18 @@ void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 	// DOREPLIFETIME(URpg_ContainerComponent, Slots);
 }
 
+void URpg_ContainerComponent::InitializeContainers()
+{
+	Containers.Empty();
+
+	for (UInventoryContainerDefinition* Def : DefaultContainerDefinitions)
+	{
+		FInventoryContainerInstance& NewInstance = Containers.Emplace_GetRef();
+		NewInstance.Definition = Def;
+		NewInstance.InventoryList.OwnerComponent = this; // falls du das brauchst
+	}
+}
+
 void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 {
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))

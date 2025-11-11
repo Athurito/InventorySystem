@@ -2,3 +2,8 @@
 
 
 #include "InventoryFragment_Hud.h"
+
+UTexture2D* UInventoryFragment_Hud::GetIcon() const
+{
+	return Icon.Get();
+}

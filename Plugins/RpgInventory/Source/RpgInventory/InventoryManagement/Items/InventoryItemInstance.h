@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "GameplayTagStack.h"
-#include "InventoryItemInstance.h"
 #include "UObject/Object.h"
 #include "InventoryItemInstance.generated.h"
 

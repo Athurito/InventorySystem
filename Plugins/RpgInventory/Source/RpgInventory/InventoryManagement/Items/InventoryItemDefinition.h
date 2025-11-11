@@ -29,7 +29,7 @@ public:
 	
 private:
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Inventory", Instanced)
+	UPROPERTY(EditDefaultsOnly, Category="Inventory", Instanced)
 	TArray<TObjectPtr<UInventoryItemFragment>> Fragments;
 
 	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (Categories="GameItems"))

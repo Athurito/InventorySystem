@@ -19,9 +19,9 @@ bool UInventoryFragment_Consumable::PreflightCanUse(const FItemRuntimeDataContai
 	if (!Def) return false;
 	if (bReduceStack)
 	{
-		const FStackableRuntimeData* S = Runtime.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
-		const int32 Have = S ? S->CurrentStackCount : 1;
-		if (Have < FMath::Max(1, QuantityPerUse)) return false;
+		// // const FStackableRuntimeData* S = Runtime.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
+		// const int32 Have = S ? S->CurrentStackCount : 1;
+		// if (Have < FMath::Max(1, QuantityPerUse)) return false;
 	}
 	// Durability checks could be added here later
 	return true;
@@ -31,29 +31,29 @@ bool UInventoryFragment_Consumable::ReduceStackAfterUse(FItemRuntimeDataContaine
 {
 	bool bChanged = false;
 	Uses = FMath::Max(0, Uses);
-	if (bReduceStack)
-	{
-		if (const FInventoryFragment_Stackable* Stackable = Def->GetFragmentOfTypeWithTag<FInventoryFragment_Stackable>(FragmentTags::StackableFragment))
-		{
-
-			if (auto* S = Runtime.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,[&](FStackableRuntimeData& D)
-			{
-				const int32 Max  = FMath::Max(1, Stackable->GetMaxStackSize());
-				const int32 Cost = FMath::Max(1, QuantityPerUse) * Uses;
-
-				// Optionaler Fallback, falls der Eintrag neu war
-				if (D.CurrentStackCount <= 0)
-				{
-					D.CurrentStackCount = 1;
-				}
-
-				D.CurrentStackCount = FMath::Clamp(D.CurrentStackCount - Cost, 0, Max);
-			}))
-			{
-				bChanged = true;  // Modify gibt != nullptr zurück → es wurde geschrieben & dirty markiert
-			}
-		}
-	}
-	// Durability cost could be applied here later
+	// if (bReduceStack)
+	// {
+	// 	if (const FInventoryFragment_Stackable* Stackable = Def->GetFragmentOfTypeWithTag<FInventoryFragment_Stackable>(FragmentTags::StackableFragment))
+	// 	{
+	//
+	// 		if (auto* S = Runtime.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,[&](FStackableRuntimeData& D)
+	// 		{
+	// 			const int32 Max  = FMath::Max(1, Stackable->GetMaxStackSize());
+	// 			const int32 Cost = FMath::Max(1, QuantityPerUse) * Uses;
+	//
+	// 			// Optionaler Fallback, falls der Eintrag neu war
+	// 			if (D.CurrentStackCount <= 0)
+	// 			{
+	// 				D.CurrentStackCount = 1;
+	// 			}
+	//
+	// 			D.CurrentStackCount = FMath::Clamp(D.CurrentStackCount - Cost, 0, Max);
+	// 		}))
+	// 		{
+	// 			bChanged = true;  // Modify gibt != nullptr zurück → es wurde geschrieben & dirty markiert
+	// 		}
+	// 	}
+	// }
+	// // Durability cost could be applied here later
 	return bChanged;
 }

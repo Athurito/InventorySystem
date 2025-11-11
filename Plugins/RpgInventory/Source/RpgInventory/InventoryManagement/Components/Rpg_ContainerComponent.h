@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Net/Serialization/FastArraySerializer.h"
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
+#include "RpgInventory/InventoryManagement/FastArray/InventoryItemList.h"
 #include "UObject/PrimaryAssetId.h"
 #include "Rpg_ContainerComponent.generated.h"
 
@@ -17,7 +17,7 @@ struct FInventoryDragPayload
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite)
-	TWeakObjectPtr<class URpg_ContainerComponent> SourceComponent;
+	TWeakObjectPtr<URpg_ContainerComponent> SourceComponent;
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 SourceContainerIndex = INDEX_NONE;
@@ -33,21 +33,26 @@ struct FInventoryDragPayload
 };
 
 USTRUCT()
-struct FContainerSlotMap
+struct FInventoryContainerInstance
 {
 	GENERATED_BODY()
-	UPROPERTY() TArray<FGuid> SlotToInstance; // Größe = Rows*Cols, FGuid() == leer
-};
+	
+	UPROPERTY()
+	TObjectPtr<const UInventoryContainerDefinition> Definition = nullptr;
+	
+	UPROPERTY()
+	FInventoryList InventoryList;
+	
+	int32 GetNumSlots() const
+	{
+		return Definition ? Definition->Rows * Definition->Cols : 0;
+	}
 
-// Forward declarations to avoid heavy includes
-enum class EInventorySlotType : uint8;
-enum class EUseContext : uint8;
-class UInventoryContainerDefinition;
-class UAbilitySystemComponent;
-class APawn;
-struct FInventoryFragment_Consumable;
-class UInventoryItemComponent;
-class UInventoryItemDefinition;
+	bool IsValidSlot(int32 SlotIndex) const
+	{
+		return SlotIndex >= 0 && SlotIndex < GetNumSlots();
+	}
+};
 
 USTRUCT(BlueprintType)
 struct FInvContainerEntry
@@ -65,19 +70,18 @@ class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
 
 public:
 	URpg_ContainerComponent();
-	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
+	void InitializeContainers();
 	void AddRepSubObject(UObject* SubObject);
 
-	
 protected:
 	virtual void BeginPlay() override;
 
 private:
-	
+
+	UPROPERTY(EditDefaultsOnly, Category="Inventory")
+	TArray<TObjectPtr<UInventoryContainerDefinition>> DefaultContainerDefinitions;
+
+	UPROPERTY(Replicated)
+	TArray<FInventoryContainerInstance> Containers;
 };
-
-
-
-
-

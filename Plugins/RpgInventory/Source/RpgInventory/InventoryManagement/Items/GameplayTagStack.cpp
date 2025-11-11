@@ -4,6 +4,10 @@
 #include "GameplayTagStack.h"
 
 
+FString FGameplayTagStack::GetDebugString() const
+{
+	return FString();
+}
 
 void FGameplayTagStackContainer::AddStack(FGameplayTag Tag, int32 StackCount)
 {

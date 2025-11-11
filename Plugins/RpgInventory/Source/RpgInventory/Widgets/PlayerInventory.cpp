@@ -55,57 +55,57 @@ void UPlayerInventory::BuildPlayerTabsAndContent()
 		return;
 	}
 
-	const int32 Count = PlayerContainerComponent->GetContainerCount();
-	if (Count <= 0) return;
+	// const int32 Count = PlayerContainerComponent->GetContainerCount();
+	// if (Count <= 0) return;
+	//
+	// for (int32 i = 0; i < Count; ++i)
+	// {
+	// 	const UInventoryContainerDefinition* Def = PlayerContainerComponent->GetContainerDefinition(i);
+	// 	if (!Def) continue;
+	//
+	// 	// 1) TabId
+	// 	const FName TabId = *FString::Printf(TEXT("Player_%d"), i);
+	// 	TabMap.Add(TabId, { PlayerContainerComponent, i });
+	//
+	// 	// 2) Tab Button registrieren (ohne Content -> wir verwalten Switcher manuell)
+	// 	const bool bOk = PlayerTabList->RegisterTab(TabId, PlayerTabButtonClass, /*ContentWidget*/ nullptr);
+	// 	if (!bOk) continue;
+	//
+	// 	// 3) Grid erzeugen (ein Widget pro Tab) und binden
+	// 	UContainerGrid* NewGridWidget = CreateWidget<UContainerGrid>(this, ContainerGridClass);
+	// 	if (!NewGridWidget) continue;
+	// 	NewGridWidget->BindToContainer(PlayerContainerComponent.Get(), i);
+	// 	PlayerTabContentSwitcher->AddChild(NewGridWidget);
+	// 	const int32 SwitcherIndex = PlayerTabContentSwitcher->GetChildIndex(NewGridWidget);
+	// 	TabToContentIndex.Add(TabId, SwitcherIndex);
+	// 	if (SwitcherIndex == INDEX_NONE)
+	// 	{
+	// 		UE_LOG(LogTemp, Warning, TEXT("UPlayerInventory: Failed to resolve switcher index for %s"), *TabId.ToString());
+	// 	}
+	//
+	// 	// 4) Button betiteln
+	// 	if (UCommonButtonBase* RawBtn = PlayerTabList->GetTabButtonBaseByID(TabId))
+	// 	{
+	// 		if (UInventoryTabButton* Btn = Cast<UInventoryTabButton>(RawBtn))
+	// 		{
+	// 			const FText Label = !Def->DisplayName.IsEmpty()
+	// 				? Def->DisplayName
+	// 				: FText::FromString(FString::Printf(TEXT("Bag %d"), i + 1));
+	// 			Btn->SetLabelAndIcon(Label, Def->TabIcon);
+	// 		}
+	// 	}
+	// }
 
-	for (int32 i = 0; i < Count; ++i)
-	{
-		const UInventoryContainerDefinition* Def = PlayerContainerComponent->GetContainerDefinition(i);
-		if (!Def) continue;
-
-		// 1) TabId
-		const FName TabId = *FString::Printf(TEXT("Player_%d"), i);
-		TabMap.Add(TabId, { PlayerContainerComponent, i });
-
-		// 2) Tab Button registrieren (ohne Content -> wir verwalten Switcher manuell)
-		const bool bOk = PlayerTabList->RegisterTab(TabId, PlayerTabButtonClass, /*ContentWidget*/ nullptr);
-		if (!bOk) continue;
-
-		// 3) Grid erzeugen (ein Widget pro Tab) und binden
-		UContainerGrid* NewGridWidget = CreateWidget<UContainerGrid>(this, ContainerGridClass);
-		if (!NewGridWidget) continue;
-		NewGridWidget->BindToContainer(PlayerContainerComponent.Get(), i);
-		PlayerTabContentSwitcher->AddChild(NewGridWidget);
-		const int32 SwitcherIndex = PlayerTabContentSwitcher->GetChildIndex(NewGridWidget);
-		TabToContentIndex.Add(TabId, SwitcherIndex);
-		if (SwitcherIndex == INDEX_NONE)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("UPlayerInventory: Failed to resolve switcher index for %s"), *TabId.ToString());
-		}
-
-		// 4) Button betiteln
-		if (UCommonButtonBase* RawBtn = PlayerTabList->GetTabButtonBaseByID(TabId))
-		{
-			if (auto* Btn = Cast<UInventoryTabButton>(RawBtn))
-			{
-				const FText Label = !Def->DisplayName.IsEmpty()
-					? Def->DisplayName
-					: FText::FromString(FString::Printf(TEXT("Bag %d"), i + 1));
-				Btn->SetLabelAndIcon(Label, Def->TabIcon);
-			}
-		}
-	}
-
-	// Start-Tab wählen
-	const int32 StartIdx = FMath::Clamp(RequestedStartTabIndex, 0, Count - 1);
-	const FName StartTabId = *FString::Printf(TEXT("Player_%d"), StartIdx);
-	PlayerTabList->SelectTabByID(StartTabId, /*bSuppressClickFeedback*/ true);
-
-	// Content switchen
-	if (const int32* ContentIdx = TabToContentIndex.Find(StartTabId))
-	{
-		PlayerTabContentSwitcher->SetActiveWidgetIndex(*ContentIdx);
-	}
+	// // Start-Tab wählen
+	// const int32 StartIdx = FMath::Clamp(RequestedStartTabIndex, 0, Count - 1);
+	// const FName StartTabId = *FString::Printf(TEXT("Player_%d"), StartIdx);
+	// PlayerTabList->SelectTabByID(StartTabId, /*bSuppressClickFeedback*/ true);
+	//
+	// // Content switchen
+	// if (const int32* ContentIdx = TabToContentIndex.Find(StartTabId))
+	// {
+	// 	PlayerTabContentSwitcher->SetActiveWidgetIndex(*ContentIdx);
+	// }
 }
 
 void UPlayerInventory::EnsurePlayerComponent()
