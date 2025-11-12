@@ -35,21 +35,23 @@ public:
 	void UpdateIcon(UTexture2D* Icon) const;
 
 	// Drag&Drop/Context helpers for Blueprints
- UFUNCTION(BlueprintPure, Category="Inventory|UI")
-	URpg_ContainerComponent* GetOwningContainerComponent() const { return OwningContainerComponent; }
+	UFUNCTION(BlueprintPure, Category="Inventory|UI")
+	URpg_ContainerComponent* GetOwningContainerComponent() const;
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	int32 GetOwningContainerIndex() const { return OwningContainerIndex; }
 	UFUNCTION(BlueprintCallable, Category="Inventory|UI")
-	void InitializeSlotContext(URpg_ContainerComponent* InComponent, int32 InContainerIndex) { OwningContainerComponent = InComponent; OwningContainerIndex = InContainerIndex; }
+	void InitializeSlotContext(URpg_ContainerComponent* InComponent, int32 InContainerIndex);
 
 private:
+	
 	int32 SlotIndex{INDEX_NONE};
 	int32 StackCount{0};
 
 	FInv_InventoryEntry* InventoryItem{nullptr};
 
  // Owning container context for BP drag/drop
-	TObjectPtr<URpg_ContainerComponent> OwningContainerComponent = nullptr;
+	UPROPERTY()
+	TWeakObjectPtr<URpg_ContainerComponent> OwningContainerComponent = nullptr;
 	int32 OwningContainerIndex{INDEX_NONE};
 
 	UPROPERTY(meta = (BindWidget))
@@ -57,4 +59,10 @@ private:
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_StackCount;
+
+
+	UFUNCTION()
+	void HandleSlotChanged(int32 ChangedSlotIndex);
+	void RefreshSlot();
+	void ClearSlot();
 };

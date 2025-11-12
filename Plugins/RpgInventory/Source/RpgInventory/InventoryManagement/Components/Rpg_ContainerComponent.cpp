@@ -4,6 +4,7 @@
 
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
+#include "Net/UnrealNetwork.h"
 
 URpg_ContainerComponent::URpg_ContainerComponent()
 {
@@ -11,11 +12,10 @@ URpg_ContainerComponent::URpg_ContainerComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void URpg_ContainerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	// DOREPLIFETIME(URpg_ContainerComponent, Containers);
-	// DOREPLIFETIME(URpg_ContainerComponent, Slots);
+	DOREPLIFETIME(URpg_ContainerComponent, Containers);
 }
 
 void URpg_ContainerComponent::InitializeContainers()
@@ -30,12 +30,28 @@ void URpg_ContainerComponent::InitializeContainers()
 	}
 }
 
+
 void URpg_ContainerComponent::AddRepSubObject(UObject* SubObject)
 {
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
 	{
 		AddReplicatedSubObject(SubObject);
 	}
+}
+
+void URpg_ContainerComponent::BroadcastSlotChanged(int32 SlotIndex) const
+{
+	OnInventorySlotChanged.Broadcast(SlotIndex);
+}
+
+UInventoryItemInstance* URpg_ContainerComponent::GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const
+{
+	if (Containers.IsEmpty() || !Containers.IsValidIndex(ContainerIndex) || SlotIndex < 0)
+	{
+		return nullptr;
+	}
+	
+	return Containers[ContainerIndex].InventoryList.GetItemInstanceInSlot(SlotIndex);
 }
 
 void URpg_ContainerComponent::BeginPlay()

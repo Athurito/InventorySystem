@@ -96,6 +96,10 @@ public:
 
 	void RemoveEntry(UInventoryItemInstance* Instance);
 
+	UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex) const;
+
+	
+
 private:
 	void BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount);
 

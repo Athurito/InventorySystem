@@ -3,6 +3,8 @@
 
 #include "InventoryItemList.h"
 
+#include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
+
 
 FString FInventoryEntry::GetDebugString() const
 {
@@ -37,4 +39,16 @@ void FInventoryList::AddEntry(UInventoryItemInstance* Instance)
 
 void FInventoryList::RemoveEntry(UInventoryItemInstance* Instance)
 {
+}
+
+UInventoryItemInstance* FInventoryList::GetItemInstanceInSlot(int32 SlotIndex) const
+{
+	for (const auto& Entry : Entries)
+	{
+		if (Entry.SlotIndex == SlotIndex) 
+		{
+			return Entry.Instance;
+		}
+	}
+	return nullptr;
 }

@@ -62,6 +62,7 @@ struct FInvContainerEntry
 	UPROPERTY(BlueprintReadOnly) int32 Index = INDEX_NONE; // Index im Containers-Array
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotChanged, int32, SlotIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
@@ -73,6 +74,13 @@ public:
 	
 	void InitializeContainers();
 	void AddRepSubObject(UObject* SubObject);
+
+	void BroadcastSlotChanged(int32 SlotIndex) const;
+
+	UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInventorySlotChanged OnInventorySlotChanged;
 
 protected:
 	virtual void BeginPlay() override;

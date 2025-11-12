@@ -9,11 +9,8 @@ class UContainerSlotButton;
 class URpg_ContainerComponent;
 class UUniformGridPanel;
 struct FInv_InventoryEntry;
-/**
- * Ein generisches Grid-Widget, das eine ContainerComponent repräsentiert.
- * Baut die eigentliche Darstellung nicht hart im Code auf, sondern stellt
- * Bind/Metadata-Funktionen bereit, damit Blueprints flexibel die UI anlegen können.
- */
+
+
 UCLASS()
 class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
 {
@@ -39,7 +36,6 @@ public:
 	int32 GetBoundContainerIndex() const { return ContainerIndex; }
 
 protected:
-	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 
 private:

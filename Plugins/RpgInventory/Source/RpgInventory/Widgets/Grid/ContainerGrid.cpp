@@ -68,11 +68,6 @@ void UContainerGrid::HandleEntryChanged(FGuid InstanceId, const FInventoryEntry&
 	// }
 }
 
-void UContainerGrid::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-}
-
 void UContainerGrid::NativeDestruct()
 {
 	UnbindFromCurrent();
