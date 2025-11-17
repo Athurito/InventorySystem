@@ -45,7 +45,7 @@ public class RpgInventory : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"EnhancedInput",
+				"EnhancedInput", "ModelViewViewModel",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

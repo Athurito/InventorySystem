@@ -9,7 +9,7 @@
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "InventorySystem.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
 void AInventorySystemPlayerController::BeginPlay()

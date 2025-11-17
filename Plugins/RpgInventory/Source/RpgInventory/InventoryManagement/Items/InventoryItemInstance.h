@@ -58,7 +58,8 @@ private:
 
 	// The item definition
 	UPROPERTY(Replicated)
-	TSubclassOf<UInventoryItemDefinition> ItemDef;
+	TObjectPtr<UInventoryItemDefinition> ItemDef;
 
-	void SetItemDef(TSubclassOf<UInventoryItemDefinition> InDef);
+	void SetItemDef(UInventoryItemDefinition* InDef);
+	friend struct FInventoryList;
 };

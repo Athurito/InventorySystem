@@ -6,6 +6,7 @@
 #include "UObject/Object.h"
 #include "InventoryItemFragment.generated.h"
 
+class UInventoryItemInstance;
 /**
  * 
  */
@@ -14,5 +15,8 @@ class UInventoryItemFragment : public UObject
 {
 	GENERATED_BODY()
 	
+public:
 	
+	virtual void OnInstanceCreated(UInventoryItemInstance* Instance) const {}
+	virtual void OnStackInitialized(UInventoryItemInstance* Instance, int32 StackCount) const {}
 };

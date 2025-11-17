@@ -4,7 +4,7 @@
 #include "UObject/PrimaryAssetId.h"
 #include "InventoryBlueprintLibrary.generated.h"
 
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 class UInventoryItemComponent;
 
 UCLASS()
@@ -19,7 +19,7 @@ public:
 	 * UI can listen to URpg_ContainerComponent::OnItemConsumed and OnItemRemoved to refresh.
 	 */
 	UFUNCTION(BlueprintCallable, Category="Inventory|Container", meta=(DefaultToSelf="Container"))
-	static bool ConsumeStackByInstance(URpg_ContainerComponent* Container, int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutConsumed);
+	static bool ConsumeStackByInstance(UInventoryManagerComponent* Container, int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutConsumed);
 
 	/**
 	 * Reduce the stack on a world item component directly (server only).

@@ -5,7 +5,7 @@
 
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 
 void UContainerSlotButton::UpdateText() const
 {
@@ -29,12 +29,12 @@ void UContainerSlotButton::UpdateIcon(UTexture2D* Icon) const
 	Image_Icon->SetBrushFromTexture(Icon);
 }
 
-URpg_ContainerComponent* UContainerSlotButton::GetOwningContainerComponent() const
+UInventoryManagerComponent* UContainerSlotButton::GetOwningContainerComponent() const
 {
 	return OwningContainerComponent.Get();
 }
 
-void UContainerSlotButton::InitializeSlotContext(URpg_ContainerComponent* InComponent, int32 InContainerIndex)
+void UContainerSlotButton::InitializeSlotContext(UInventoryManagerComponent* InComponent, int32 InContainerIndex)
 {
 	OwningContainerComponent = InComponent; OwningContainerIndex = InContainerIndex;
 	

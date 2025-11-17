@@ -9,7 +9,7 @@
 #include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Consumable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 #include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
@@ -236,7 +236,7 @@ bool UInventoryItemComponent::CanInteract_Implementation(APawn* Instigator) cons
 
 void UInventoryItemComponent::Interact_Implementation(APawn* Instigator)
 {
-	URpg_ContainerComponent* InventoryComponent = nullptr;
+	UInventoryManagerComponent* InventoryComponent = nullptr;
 	
 	InventoryComponent = UInventoryStatics::ResolveInventoryFromInstigator(Instigator);
 	

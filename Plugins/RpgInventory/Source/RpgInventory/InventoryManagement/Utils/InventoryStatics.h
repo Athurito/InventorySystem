@@ -7,7 +7,7 @@
 #include "InventoryStatics.generated.h"
 
 class UAbilitySystemComponent;
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 class UInventoryItemDefinition;
 /**
  * 
@@ -21,7 +21,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	static UInventoryItemDefinition* GetItemDefinitionById(const FPrimaryAssetId& ItemId);
-	static URpg_ContainerComponent* GetContainerComponent(AActor* Owner);
-	static URpg_ContainerComponent* ResolveInventoryFromInstigator(APawn* Instigator);
+	static UInventoryManagerComponent* GetContainerComponent(AActor* Owner);
+	static UInventoryManagerComponent* ResolveInventoryFromInstigator(APawn* Instigator);
 	static UAbilitySystemComponent* ResolveASCFromPawn(APawn* InstigatorPawn);
 };

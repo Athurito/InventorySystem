@@ -2,9 +2,9 @@
 
 #include "InventoryBlueprintLibrary.h"
 
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 
-bool UInventoryBlueprintLibrary::ConsumeStackByInstance(URpg_ContainerComponent* Container, int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutConsumed)
+bool UInventoryBlueprintLibrary::ConsumeStackByInstance(UInventoryManagerComponent* Container, int32 ContainerIndex, const FGuid& InstanceId, int32 Quantity, int32& OutConsumed)
 {
 	return false;
 	// OutConsumed = 0;

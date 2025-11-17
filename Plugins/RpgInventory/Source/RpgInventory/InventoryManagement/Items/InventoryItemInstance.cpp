@@ -43,13 +43,13 @@ const UInventoryItemFragment* UInventoryItemInstance::FindFragmentByClass(TSubcl
 {
 	if ((ItemDef != nullptr) && (FragmentClass != nullptr))
 	{
-		return GetDefault<UInventoryItemDefinition>(ItemDef)->FindFragmentByClass(FragmentClass);
+		return ItemDef->FindFragmentByClass(FragmentClass);
 	}
 
 	return nullptr;
 }
 
-void UInventoryItemInstance::SetItemDef(TSubclassOf<UInventoryItemDefinition> InDef)
+void UInventoryItemInstance::SetItemDef(UInventoryItemDefinition* InDef)
 {
 	ItemDef = InDef;
 }

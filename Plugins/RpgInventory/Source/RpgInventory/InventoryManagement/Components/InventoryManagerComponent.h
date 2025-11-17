@@ -7,7 +7,7 @@
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "RpgInventory/InventoryManagement/FastArray/InventoryItemList.h"
 #include "UObject/PrimaryAssetId.h"
-#include "Rpg_ContainerComponent.generated.h"
+#include "InventoryManagerComponent.generated.h"
 
 struct FInvSlotArray;
 
@@ -17,7 +17,7 @@ struct FInventoryDragPayload
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite)
-	TWeakObjectPtr<URpg_ContainerComponent> SourceComponent;
+	TWeakObjectPtr<UInventoryManagerComponent> SourceComponent;
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 SourceContainerIndex = INDEX_NONE;
@@ -65,12 +65,12 @@ struct FInvContainerEntry
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotChanged, int32, SlotIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
-class RPGINVENTORY_API URpg_ContainerComponent : public UActorComponent
+class RPGINVENTORY_API UInventoryManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	URpg_ContainerComponent();
+	UInventoryManagerComponent();
 	
 	void InitializeContainers();
 	void AddRepSubObject(UObject* SubObject);
@@ -81,6 +81,20 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	UInventoryItemInstance* AddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 ContainerIndex, int32 StackCount);
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	void AddItemInstance(UInventoryItemInstance* Instance, int32 SlotIndex, int32 ContainerIndex);
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	void RemoveItemInstance(UInventoryItemInstance* Instance, int32 ContainerIndex);
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	TArray<UInventoryItemInstance*> GetAllItems(int32 ContainerIndex) const;
+
+	
 
 protected:
 	virtual void BeginPlay() override;

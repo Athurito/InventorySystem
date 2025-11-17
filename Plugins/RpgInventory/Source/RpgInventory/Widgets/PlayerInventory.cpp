@@ -9,7 +9,7 @@
 #include "InventoryTabButton.h"
 #include "TabList.h"
 #include "Grid/ContainerGrid.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
 
@@ -118,7 +118,7 @@ void UPlayerInventory::EnsurePlayerComponent()
 			AActor* OwnerActor = PC->PlayerState ? static_cast<AActor*>(PC->PlayerState) : static_cast<AActor*>(PC);
 			if (OwnerActor)
 			{
-				if (URpg_ContainerComponent* AutoComp = UInventoryStatics::GetContainerComponent(OwnerActor))
+				if (UInventoryManagerComponent* AutoComp = UInventoryStatics::GetContainerComponent(OwnerActor))
 				{
 					PlayerContainerComponent = AutoComp;
 				}

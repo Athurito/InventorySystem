@@ -9,7 +9,7 @@
 class UPlayerInventory;
 class UCommonTabListWidgetBase;
 class UContainerGrid;
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 class UWidget;
 class UOverlay;
 

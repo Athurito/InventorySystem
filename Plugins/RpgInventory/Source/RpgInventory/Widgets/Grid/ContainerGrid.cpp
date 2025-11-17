@@ -1,13 +1,13 @@
 #include "ContainerGrid.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/Widgets/GridSlots/ContainerSlotButton.h"
 
 
 void UContainerGrid::BindDelegates()
 {
-	if (URpg_ContainerComponent* Comp = ContainerComponent.Get())
+	if (UInventoryManagerComponent* Comp = ContainerComponent.Get())
 	{
 		// Comp->OnSlotChanged.AddDynamic(this, &UContainerGrid::HandleSlotChanged);
 		// Comp->OnEntryChanged.AddDynamic(this, &UContainerGrid::HandleEntryChanged);
@@ -74,7 +74,7 @@ void UContainerGrid::NativeDestruct()
 	Super::NativeDestruct();
 }
 
-void UContainerGrid::BindToContainer(URpg_ContainerComponent* InComponent, int32 InContainerIndex)
+void UContainerGrid::BindToContainer(UInventoryManagerComponent* InComponent, int32 InContainerIndex)
 {
 	UnbindFromCurrent();
 	ContainerComponent = InComponent;

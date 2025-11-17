@@ -5,7 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "Engine/AssetManager.h"
 #include "GameFramework/PlayerState.h"
-#include "RpgInventory/InventoryManagement/Components/Rpg_ContainerComponent.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 
 
@@ -24,34 +24,34 @@ UInventoryItemDefinition* UInventoryStatics::GetItemDefinitionById(const FPrimar
 	return Def;
 }
 
-URpg_ContainerComponent* UInventoryStatics::GetContainerComponent(AActor* Owner)
+UInventoryManagerComponent* UInventoryStatics::GetContainerComponent(AActor* Owner)
 {
 	if (!IsValid(Owner))
 	{
 		return nullptr;
 	}
 
-	return Owner->FindComponentByClass<URpg_ContainerComponent>();
+	return Owner->FindComponentByClass<UInventoryManagerComponent>();
 }
 
-URpg_ContainerComponent* UInventoryStatics::ResolveInventoryFromInstigator(APawn* Instigator)
+UInventoryManagerComponent* UInventoryStatics::ResolveInventoryFromInstigator(APawn* Instigator)
 {
 	if (!IsValid(Instigator))
 		return nullptr;
 	
 	if (APlayerState* PS = Instigator->GetPlayerState())
 	{
-		if (URpg_ContainerComponent* C = PS->FindComponentByClass<URpg_ContainerComponent>())
+		if (UInventoryManagerComponent* C = PS->FindComponentByClass<UInventoryManagerComponent>())
 			return C;
 	}
 	
 	if (AController* Controller = Instigator->GetController())
 	{
-		if (URpg_ContainerComponent* C = Controller->FindComponentByClass<URpg_ContainerComponent>())
+		if (UInventoryManagerComponent* C = Controller->FindComponentByClass<UInventoryManagerComponent>())
 			return C;
 	}
 
-	if (URpg_ContainerComponent* C = Instigator->FindComponentByClass<URpg_ContainerComponent>())
+	if (UInventoryManagerComponent* C = Instigator->FindComponentByClass<UInventoryManagerComponent>())
 	{
 		return C;
 	}

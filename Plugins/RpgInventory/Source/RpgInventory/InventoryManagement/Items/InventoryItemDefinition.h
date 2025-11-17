@@ -11,7 +11,7 @@ class UInventoryItemFragment;
 /**
  * 
  */
-UCLASS(Const, Abstract)
+UCLASS(Const)
 class RPGINVENTORY_API UInventoryItemDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
@@ -26,7 +26,7 @@ public:
 	const FGameplayTag& GetItemType() const { return ItemType; }
 	
 	UInventoryItemFragment* FindFragmentByClass(TSubclassOf<UInventoryItemFragment> FragmentClass) const;
-	
+	TArray<TObjectPtr<UInventoryItemFragment>> GetFragments() const { return Fragments; }
 private:
 
 	UPROPERTY(EditDefaultsOnly, Category="Inventory", Instanced)

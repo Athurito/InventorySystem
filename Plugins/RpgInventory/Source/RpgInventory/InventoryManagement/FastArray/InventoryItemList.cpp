@@ -3,7 +3,9 @@
 
 #include "InventoryItemList.h"
 
+#include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryItemFragment.h"
 
 
 FString FInventoryEntry::GetDebugString() const
@@ -28,13 +30,33 @@ void FInventoryList::PostReplicatedChange(const TArrayView<int32> ChangedIndices
 {
 }
 
-UInventoryItemInstance* FInventoryList::AddEntry(TSubclassOf<UInventoryItemDefinition> ItemClass, int32 StackCount)
+UInventoryItemInstance* FInventoryList::AddEntry(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 StackCount)
 {
-	return nullptr;
+	check(ItemDefinition != nullptr)
+	check(OwnerComponent)
+	
+	AActor* OwnerActor = OwnerComponent->GetOwner();
+	check(OwnerActor->HasAuthority())
+	
+	FInventoryEntry& NewEntry = Entries.AddDefaulted_GetRef();
+	NewEntry.SlotIndex = SlotIndex;
+	AActor* Owner = OwnerComponent->GetOwner();
+	NewEntry.Instance = NewObject<UInventoryItemInstance>(Owner);
+	NewEntry.Instance->SetItemDef(ItemDefinition);
+
+	for (UInventoryItemFragment* Fragment : ItemDefinition->GetFragments())
+	{
+		Fragment->OnInstanceCreated(NewEntry.Instance);
+		Fragment->OnStackInitialized(NewEntry.Instance, StackCount);
+	}
+	
+	MarkItemDirty(NewEntry);
+	return NewEntry.Instance;
 }
 
-void FInventoryList::AddEntry(UInventoryItemInstance* Instance)
+void FInventoryList::AddEntry(UInventoryItemInstance* Instance, int32 SlotIndex)
 {
+	unimplemented();
 }
 
 void FInventoryList::RemoveEntry(UInventoryItemInstance* Instance)

@@ -9,11 +9,11 @@
 class UCommonActivatableWidgetSwitcher;
 class UInventoryTabButton;
 class UTabList;
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 /**
  * 
  */
-struct FContainerRef { TWeakObjectPtr<URpg_ContainerComponent> Comp; int32 Index=-1; };
+struct FContainerRef { TWeakObjectPtr<UInventoryManagerComponent> Comp; int32 Index=-1; };
 UCLASS()
 class RPGINVENTORY_API UPlayerInventory : public UCommonUserWidget
 {
@@ -24,10 +24,10 @@ public:
 
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
-	URpg_ContainerComponent* GetPlayerContainerComponent() const { return PlayerContainerComponent.Get(); }
+	UInventoryManagerComponent* GetPlayerContainerComponent() const { return PlayerContainerComponent.Get(); }
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
-	URpg_ContainerComponent* GetContextContainerComponent() const { return ContextContainerComponent.Get(); }
+	UInventoryManagerComponent* GetContextContainerComponent() const { return ContextContainerComponent.Get(); }
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	int32 GetContextContainerIndex() const { return ContextContainerIndex; }
@@ -52,8 +52,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TSubclassOf<UUserWidget> ContainerGridClass = nullptr; // e.g., UContainerGrid
 	
-	TWeakObjectPtr<URpg_ContainerComponent> PlayerContainerComponent;
-	TWeakObjectPtr<URpg_ContainerComponent> ContextContainerComponent;
+	TWeakObjectPtr<UInventoryManagerComponent> PlayerContainerComponent;
+	TWeakObjectPtr<UInventoryManagerComponent> ContextContainerComponent;
 	
 	int32 ContextContainerIndex = INDEX_NONE;
 	

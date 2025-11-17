@@ -8,7 +8,7 @@
 
 class UInventoryItemDefinition;
 struct FInventoryList;
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 class UInventoryItemInstance;
 /**
  * 
@@ -46,14 +46,11 @@ struct FInventoryEntry : public FFastArraySerializerItem
 
 private:
 	friend FInventoryList;
-	friend URpg_ContainerComponent;
+	friend UInventoryManagerComponent;
 
 	UPROPERTY()
 	TObjectPtr<UInventoryItemInstance> Instance = nullptr;
-
-	UPROPERTY()
-	int32 StackCount = 0;
-
+	
 	UPROPERTY(NotReplicated)
 	int32 LastObservedCount = INDEX_NONE;
 
@@ -91,8 +88,8 @@ public:
 		return FastArrayDeltaSerialize<FInventoryEntry, FInventoryList>(Entries, DeltaParms, *this);
 	}
 
-	UInventoryItemInstance* AddEntry(TSubclassOf<UInventoryItemDefinition> ItemClass, int32 StackCount);
-	void AddEntry(UInventoryItemInstance* Instance);
+	UInventoryItemInstance* AddEntry(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex,  int32 StackCount);
+	void AddEntry(UInventoryItemInstance* Instance, int32 SlotIndex);
 
 	void RemoveEntry(UInventoryItemInstance* Instance);
 
@@ -104,7 +101,7 @@ private:
 	void BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount);
 
 private:
-	friend URpg_ContainerComponent;
+	friend UInventoryManagerComponent;
 
 private:
 	// Replicated list of items

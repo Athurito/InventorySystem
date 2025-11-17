@@ -6,7 +6,7 @@
 #include "CommonButtonBase.h"
 #include "ContainerSlotButton.generated.h"
 
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 
 class UTextBlock;
 struct FInv_InventoryEntry;
@@ -36,11 +36,11 @@ public:
 
 	// Drag&Drop/Context helpers for Blueprints
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
-	URpg_ContainerComponent* GetOwningContainerComponent() const;
+	UInventoryManagerComponent* GetOwningContainerComponent() const;
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	int32 GetOwningContainerIndex() const { return OwningContainerIndex; }
 	UFUNCTION(BlueprintCallable, Category="Inventory|UI")
-	void InitializeSlotContext(URpg_ContainerComponent* InComponent, int32 InContainerIndex);
+	void InitializeSlotContext(UInventoryManagerComponent* InComponent, int32 InContainerIndex);
 
 private:
 	
@@ -51,7 +51,7 @@ private:
 
  // Owning container context for BP drag/drop
 	UPROPERTY()
-	TWeakObjectPtr<URpg_ContainerComponent> OwningContainerComponent = nullptr;
+	TWeakObjectPtr<UInventoryManagerComponent> OwningContainerComponent = nullptr;
 	int32 OwningContainerIndex{INDEX_NONE};
 
 	UPROPERTY(meta = (BindWidget))

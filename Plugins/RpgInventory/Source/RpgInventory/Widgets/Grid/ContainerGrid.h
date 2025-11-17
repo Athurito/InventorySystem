@@ -6,7 +6,7 @@
 
 struct FInventoryEntry;
 class UContainerSlotButton;
-class URpg_ContainerComponent;
+class UInventoryManagerComponent;
 class UUniformGridPanel;
 struct FInv_InventoryEntry;
 
@@ -19,7 +19,7 @@ class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
 public:
 	// Verknüpft dieses Grid mit einer ContainerComponent und einem ContainerIndex (z. B. 0 = Player-Inventory)
 	UFUNCTION(BlueprintCallable, Category="Container|UI")
-	void BindToContainer(URpg_ContainerComponent* InComponent, int32 InContainerIndex);
+	void BindToContainer(UInventoryManagerComponent* InComponent, int32 InContainerIndex);
 
 	// Liefert die in der Definition hinterlegte Zeilen-/Spaltenanzahl
 	UFUNCTION(BlueprintPure, Category="Container|UI")
@@ -31,7 +31,7 @@ public:
 
 	// Optional: Zugriff auf die gebundene Komponente und den Index
 	UFUNCTION(BlueprintPure, Category="Container|UI")
-	URpg_ContainerComponent* GetBoundComponent() const { return ContainerComponent.Get(); }
+	UInventoryManagerComponent* GetBoundComponent() const { return ContainerComponent.Get(); }
 	UFUNCTION(BlueprintPure, Category="Container|UI")
 	int32 GetBoundContainerIndex() const { return ContainerIndex; }
 
@@ -58,7 +58,7 @@ private:
 	void UpdateOneSlot(int32 SlotIdx);
 	
 	
-	TWeakObjectPtr<URpg_ContainerComponent> ContainerComponent;
+	TWeakObjectPtr<UInventoryManagerComponent> ContainerComponent;
 	int32 ContainerIndex = INDEX_NONE;
 	int32 CachedRows = 0;
 	int32 CachedCols = 0;
