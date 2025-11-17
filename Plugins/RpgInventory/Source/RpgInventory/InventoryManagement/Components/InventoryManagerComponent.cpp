@@ -5,7 +5,6 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
-#include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 
 UInventoryManagerComponent::UInventoryManagerComponent()
@@ -61,6 +60,7 @@ UInventoryItemInstance* UInventoryManagerComponent::AddItemDefinition(UInventory
 	UInventoryItemInstance* Result = nullptr;
 	if (ItemDefinition != nullptr)
 	{
+		check(Containers.IsValidIndex(ContainerIndex));
 		Result = Containers[ContainerIndex].InventoryList.AddEntry(ItemDefinition, SlotIndex, StackCount);
 		if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && Result)
 		{

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Net/Serialization/FastArraySerializer.h"
+#include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "InventoryItemList.generated.h"
 
 class UInventoryItemDefinition;
