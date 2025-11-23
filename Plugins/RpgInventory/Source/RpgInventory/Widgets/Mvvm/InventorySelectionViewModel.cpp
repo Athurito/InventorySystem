@@ -46,7 +46,7 @@ void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerCompon
         if (UInventoryItemInstance* Instance = Manager->GetItemInstanceInSlot(i, ContainerIndex))
         {
             const int32 Qty = Manager->GetQuantityInSlot(i, ContainerIndex);
-            Slots[i]->SetFromItemInstance(Instance, Qty);
+            Slots[i]->SetFromItemInstance(Instance, Manager.Get(), ContainerIndex, i);
         }
         else
         {
@@ -73,8 +73,7 @@ void UInventorySelectionViewModel::OnManagerSlotChanged(int32 ChangedContainer, 
 
     if (UInventoryItemInstance* Instance = Manager->GetItemInstanceInSlot(SlotIndex, ContainerIndex))
     {
-        const int32 Qty = Manager->GetQuantityInSlot(SlotIndex, ContainerIndex);
-        VM->SetFromItemInstance(Instance, Qty);
+        VM->SetFromItemInstance(Instance, Manager.Get(), ContainerIndex, SlotIndex);
     }
     else
     {

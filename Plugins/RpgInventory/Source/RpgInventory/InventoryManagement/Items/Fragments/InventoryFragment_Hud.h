@@ -16,6 +16,7 @@ class RPGINVENTORY_API UInventoryFragment_Hud : public UInventoryItemFragment
 public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UTexture2D* GetIcon() const;
+	TSoftObjectPtr<UTexture2D> GetIconSoft() const;
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TSoftObjectPtr<UTexture2D> Icon;

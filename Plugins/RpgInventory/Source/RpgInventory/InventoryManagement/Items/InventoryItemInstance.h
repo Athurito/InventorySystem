@@ -45,12 +45,17 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure=false, meta=(DeterminesOutputType=FragmentClass))
 	const UInventoryItemFragment* FindFragmentByClass(TSubclassOf<UInventoryItemFragment> FragmentClass) const;
 
+	
 	template <typename ResultClass>
 	const ResultClass* FindFragmentByClass() const
 	{
-		return static_cast<ResultClass*>(FindFragmentByClass(ResultClass::StaticClass()));
+		return Cast<ResultClass>(FindFragmentByClass(ResultClass::StaticClass()));
 	}
 
+	UInventoryItemDefinition* GetItemDefinition() const
+	{
+		return ItemDef;
+	}
 
 private:
 	UPROPERTY(Replicated)

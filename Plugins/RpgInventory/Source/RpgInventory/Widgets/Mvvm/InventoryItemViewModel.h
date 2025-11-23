@@ -18,7 +18,7 @@ class RPGINVENTORY_API UInventoryItemViewModel : public UMVVMViewModelBase
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable)
-    void SetFromItemInstance(UInventoryItemInstance* Instance, int32 InQuantity);
+    void SetFromItemInstance(UInventoryItemInstance* Instance, UInventoryManagerComponent* InManager, int32 InContainerIndex, int32 InSlotIndex);
 
     UFUNCTION(BlueprintCallable)
     void ClearSlot();
@@ -27,10 +27,27 @@ public:
     bool bIsEmpty = true;
 
     UPROPERTY(BlueprintReadOnly, FieldNotify)
-    int32 Quantity = 0;
+    TObjectPtr<UInventoryItemInstance> ItemInstance;
+    
+    
+    // Ab hier: direkt bindbare UI-Daten
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    FText DisplayName;
 
     UPROPERTY(BlueprintReadOnly, FieldNotify)
-    TObjectPtr<UInventoryItemInstance> ItemInstance;
+    TSoftObjectPtr<UTexture2D> Icon;
+
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    int32 DurabilityCurrent = 0;
+
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    int32 DurabilityMax = 0;
+    
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    int32 CurrentStackCount = 0;
+
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    int32 MaxStackSize = 0;
 
 private:
     friend class UInventorySelectionViewModel;
@@ -38,4 +55,7 @@ private:
     TWeakObjectPtr<UInventoryManagerComponent> Manager;
     int32 ContainerIndex = INDEX_NONE;
     int32 SlotIndex = INDEX_NONE;
+    
+    void FillFromDefinition();
+    void FillFromStatTags();
 };

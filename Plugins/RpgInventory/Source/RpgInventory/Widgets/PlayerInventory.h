@@ -33,8 +33,6 @@ private:
 	virtual void NativeOnInitialized() override;
 	void EnsurePlayerComponent();
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
-	TSubclassOf<UInventoryTabButton> PlayerTabButtonClass = nullptr;
 
 	// Grid-Widget-Klasse (dein UContainerGrid)
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")

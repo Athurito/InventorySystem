@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonButtonBase.h"
+#include "Blueprint/IUserObjectListEntry.h"
 #include "ContainerSlotButton.generated.h"
 
 class UInventoryManagerComponent;
@@ -15,7 +16,7 @@ class UImage;
  * 
  */
 UCLASS()
-class RPGINVENTORY_API UContainerSlotButton : public UCommonButtonBase
+class RPGINVENTORY_API UContainerSlotButton : public UCommonButtonBase, public IUserObjectListEntry
 {
 	GENERATED_BODY()
 
