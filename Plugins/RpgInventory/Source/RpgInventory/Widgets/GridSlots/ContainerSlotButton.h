@@ -31,9 +31,6 @@ public:
 	
 	FInv_InventoryEntry* GetInventoryItem() const { return InventoryItem; }
 
-	void UpdateText() const;
-	void UpdateIcon(UTexture2D* Icon) const;
-
 	// Drag&Drop/Context helpers for Blueprints
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	UInventoryManagerComponent* GetOwningContainerComponent() const;
@@ -54,15 +51,8 @@ private:
 	TWeakObjectPtr<UInventoryManagerComponent> OwningContainerComponent = nullptr;
 	int32 OwningContainerIndex{INDEX_NONE};
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> Image_Icon;
-	
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> Text_StackCount;
-
-
-	UFUNCTION()
-	void HandleSlotChanged(int32 ChangedSlotIndex);
-	void RefreshSlot();
-	void ClearSlot();
+    UFUNCTION()
+    void HandleSlotChanged(int32 ChangedContainerIndex, int32 ChangedSlotIndex);
+    void RefreshSlot();
+    void ClearSlot();
 };

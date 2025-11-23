@@ -39,8 +39,6 @@ protected:
 	virtual void NativeDestruct() override;
 
 private:
-	void CacheFromDefinition();
-	void RebuildGrid();
 	void UnbindFromCurrent() const;
 	UFUNCTION()
 	void HandleEntryChanged(FGuid InstanceId, const FInventoryEntry& Entry);
@@ -62,11 +60,7 @@ private:
 	int32 ContainerIndex = INDEX_NONE;
 	int32 CachedRows = 0;
 	int32 CachedCols = 0;
-
-	// Root-Panel für das manuelle Grid-Layout (im UMG-Designer anlegen und binden)
-	UPROPERTY(meta=(BindWidget))
-	TObjectPtr<UUniformGridPanel> GridRoot = nullptr;
-
+	
 	// Entry-Klasse für jeden Slot (Button/Widget). Im Editor setzbar.
 	UPROPERTY(EditDefaultsOnly, Category="Container|UI")
 	TSubclassOf<UContainerSlotButton> SlotButtonClass;

@@ -62,7 +62,8 @@ struct FInvContainerEntry
 	UPROPERTY(BlueprintReadOnly) int32 Index = INDEX_NONE; // Index im Containers-Array
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotChanged, int32, SlotIndex);
+// Informiert UI/ViewModels darüber, dass sich ein Slot in einem bestimmten Container geändert hat
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventorySlotChanged, int32, ContainerIndex, int32, SlotIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class RPGINVENTORY_API UInventoryManagerComponent : public UActorComponent
@@ -70,14 +71,32 @@ class RPGINVENTORY_API UInventoryManagerComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	UInventoryManagerComponent();
-	
-	void InitializeContainers();
-	void AddRepSubObject(UObject* SubObject);
+    UInventoryManagerComponent();
+    
+    void InitializeContainers();
+    void AddRepSubObject(UObject* SubObject);
 
-	void BroadcastSlotChanged(int32 SlotIndex) const;
+    // Broadcastet eine Slotänderung für einen bestimmten Container
+    void BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const;
 
-	UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const;
+    UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const;
+    
+    // --- UI‑freundliche Getter für ViewModels ---
+    int32 GetNumContainers() const { return Containers.Num(); }
+    int32 GetRows(int32 ContainerIndex) const
+    {
+        return (Containers.IsValidIndex(ContainerIndex) && Containers[ContainerIndex].Definition)
+            ? Containers[ContainerIndex].Definition->Rows
+            : 0;
+    }
+    int32 GetCols(int32 ContainerIndex) const
+    {
+        return (Containers.IsValidIndex(ContainerIndex) && Containers[ContainerIndex].Definition)
+            ? Containers[ContainerIndex].Definition->Cols
+            : 0;
+    }
+    // Aktuelle Menge im Slot (falls keine Stack‑Info vorhanden, mindestens 1 bei belegtem Slot)
+    int32 GetQuantityInSlot(int32 SlotIndex, int32 ContainerIndex) const;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;

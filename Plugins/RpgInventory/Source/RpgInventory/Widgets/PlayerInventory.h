@@ -20,9 +20,6 @@ class RPGINVENTORY_API UPlayerInventory : public UCommonUserWidget
 	GENERATED_BODY()
 
 public:
-	
-
-	
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	UInventoryManagerComponent* GetPlayerContainerComponent() const { return PlayerContainerComponent.Get(); }
 	
@@ -34,16 +31,7 @@ public:
 	
 private:
 	virtual void NativeOnInitialized() override;
-	void BuildPlayerTabsAndContent();
 	void EnsurePlayerComponent();
-	UFUNCTION()
-	void HandlePlayerTabSelected(FName TabId);
-	
-	UPROPERTY(meta=(BindWidget))
-	TObjectPtr<UTabList> PlayerTabList = nullptr;
-	
-	UPROPERTY(meta=(BindWidget))
-	TObjectPtr<UCommonActivatableWidgetSwitcher> PlayerTabContentSwitcher = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TSubclassOf<UInventoryTabButton> PlayerTabButtonClass = nullptr;

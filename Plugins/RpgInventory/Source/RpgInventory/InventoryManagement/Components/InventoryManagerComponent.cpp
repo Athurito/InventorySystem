@@ -21,14 +21,17 @@ void UInventoryManagerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 
 void UInventoryManagerComponent::InitializeContainers()
 {
-	Containers.Empty();
+    Containers.Empty();
 
-	for (UInventoryContainerDefinition* Def : DefaultContainerDefinitions)
-	{
-		FInventoryContainerInstance& NewInstance = Containers.Emplace_GetRef();
-		NewInstance.Definition = Def;
-		NewInstance.InventoryList.OwnerComponent = this; // falls du das brauchst
-	}
+    for (int32 DefIdx = 0; DefIdx < DefaultContainerDefinitions.Num(); ++DefIdx)
+    {
+        UInventoryContainerDefinition* Def = DefaultContainerDefinitions[DefIdx];
+        FInventoryContainerInstance& NewInstance = Containers.Emplace_GetRef();
+        NewInstance.Definition = Def;
+        NewInstance.InventoryList.OwnerComponent = this; // falls du das brauchst
+        // ContainerIndex für Events/Broadcasts setzen (nicht repliziert)
+        NewInstance.InventoryList.ContainerIndex = DefIdx;
+    }
 }
 
 
@@ -40,9 +43,9 @@ void UInventoryManagerComponent::AddRepSubObject(UObject* SubObject)
 	}
 }
 
-void UInventoryManagerComponent::BroadcastSlotChanged(int32 SlotIndex) const
+void UInventoryManagerComponent::BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const
 {
-	OnInventorySlotChanged.Broadcast(SlotIndex);
+    OnInventorySlotChanged.Broadcast(ContainerIndex, SlotIndex);
 }
 
 UInventoryItemInstance* UInventoryManagerComponent::GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const
@@ -90,10 +93,21 @@ void UInventoryManagerComponent::RemoveItemInstance(UInventoryItemInstance* Inst
 
 TArray<UInventoryItemInstance*> UInventoryManagerComponent::GetAllItems(int32 ContainerIndex) const
 {
-	if (Containers.IsEmpty() || !Containers.IsValidIndex(ContainerIndex))
-		return TArray<UInventoryItemInstance*>();
-	
-	return Containers[ContainerIndex].InventoryList.GetAllItems();
+    if (Containers.IsEmpty() || !Containers.IsValidIndex(ContainerIndex))
+        return TArray<UInventoryItemInstance*>();
+    
+    return Containers[ContainerIndex].InventoryList.GetAllItems();
+}
+
+int32 UInventoryManagerComponent::GetQuantityInSlot(int32 SlotIndex, int32 ContainerIndex) const
+{
+    UInventoryItemInstance* Instance = GetItemInstanceInSlot(SlotIndex, ContainerIndex);
+    if (!Instance)
+    {
+        return 0;
+    }
+    // TODO: Echte Stackmenge aus Fragments/Tags lesen
+    return 1;
 }
 
 void UInventoryManagerComponent::BeginPlay()

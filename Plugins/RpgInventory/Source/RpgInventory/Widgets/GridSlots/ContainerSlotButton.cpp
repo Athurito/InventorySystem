@@ -7,27 +7,6 @@
 #include "Components/TextBlock.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 
-void UContainerSlotButton::UpdateText() const
-{
-	if (StackCount <= 0)
-	{
-		Text_StackCount->SetVisibility(ESlateVisibility::Collapsed);
-		return;
-	}
-	Text_StackCount->SetVisibility(ESlateVisibility::Visible);
-	Text_StackCount->SetText(FText::FromString(FString::FromInt(StackCount)));
-}
-
-void UContainerSlotButton::UpdateIcon(UTexture2D* Icon) const
-{
-	if (!Icon)
-	{
-		Image_Icon->SetVisibility(ESlateVisibility::Collapsed);
-		return;
-	}
-	Image_Icon->SetVisibility(ESlateVisibility::Visible);
-	Image_Icon->SetBrushFromTexture(Icon);
-}
 
 UInventoryManagerComponent* UContainerSlotButton::GetOwningContainerComponent() const
 {
@@ -44,12 +23,17 @@ void UContainerSlotButton::InitializeSlotContext(UInventoryManagerComponent* InC
 	}
 }
 
-void UContainerSlotButton::HandleSlotChanged(int32 ChangedSlotIndex)
+void UContainerSlotButton::HandleSlotChanged(int32 ChangedContainerIndex, int32 ChangedSlotIndex)
 {
-	if (ChangedSlotIndex == SlotIndex)
-	{
-		RefreshSlot();
-	}
+    // Filter: nur reagieren, wenn der Event für unseren Container und Slot ist
+    if (ChangedContainerIndex != OwningContainerIndex)
+    {
+        return;
+    }
+    if (ChangedSlotIndex == SlotIndex)
+    {
+        RefreshSlot();
+    }
 }
 
 void UContainerSlotButton::RefreshSlot()
@@ -68,10 +52,4 @@ void UContainerSlotButton::RefreshSlot()
 void UContainerSlotButton::ClearSlot()
 {
 	InventoryItem = nullptr;
-
-	Image_Icon->SetVisibility(ESlateVisibility::Collapsed);
-	Image_Icon->SetBrushFromTexture(nullptr);
-
-	Text_StackCount->SetVisibility(ESlateVisibility::Collapsed);
-	Text_StackCount->SetText(FText());
 }

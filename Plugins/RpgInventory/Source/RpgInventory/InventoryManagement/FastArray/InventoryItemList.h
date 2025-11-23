@@ -102,15 +102,19 @@ private:
 	void BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount);
 
 private:
-	friend UInventoryManagerComponent;
+    friend UInventoryManagerComponent;
 
 private:
-	// Replicated list of items
-	UPROPERTY()
-	TArray<FInventoryEntry> Entries;
+    // Replicated list of items
+    UPROPERTY()
+    TArray<FInventoryEntry> Entries;
 
-	UPROPERTY(NotReplicated)
-	TObjectPtr<UActorComponent> OwnerComponent;
+    UPROPERTY(NotReplicated)
+    TObjectPtr<UActorComponent> OwnerComponent;
+
+    // Der Container-Index, zu dem diese Liste gehört (nur lokal für Events/Broadcasts)
+    UPROPERTY(NotReplicated)
+    int32 ContainerIndex = INDEX_NONE;
 };
 
 template<>
