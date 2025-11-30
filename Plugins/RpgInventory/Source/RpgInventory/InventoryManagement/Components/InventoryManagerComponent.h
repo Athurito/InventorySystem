@@ -6,7 +6,6 @@
 #include "Components/ActorComponent.h"
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "RpgInventory/InventoryManagement/FastArray/InventoryItemList.h"
-#include "UObject/PrimaryAssetId.h"
 #include "InventoryManagerComponent.generated.h"
 
 struct FInvSlotArray;
@@ -25,11 +24,11 @@ struct FInventoryDragPayload
 	UPROPERTY(BlueprintReadWrite)
 	int32 SourceSlotIndex = INDEX_NONE;
 	
-	UPROPERTY(BlueprintReadWrite)
-	FGuid InstanceId;
+	// UPROPERTY(BlueprintReadWrite)
+	// FGuid InstanceId;
 
 	UPROPERTY(BlueprintReadWrite)
-	int32 Quantity = 0; // 0 or less means all
+	int32 Quantity = 0;
 };
 
 USTRUCT()
@@ -104,6 +103,21 @@ public:
 	
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	TArray<UInventoryItemInstance*> GetAllItems(int32 ContainerIndex) const;
+	
+	
+	//Drag drop..
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory|DragDrop")
+	void HandleDrop(
+		UInventoryManagerComponent* SourceManager,
+		int32 SourceContainerIndex,
+		int32 SourceSlotIndex,
+		int32 TargetContainerIndex,
+		int32 TargetSlotIndex,
+		int32 DragQuantity,
+		bool bSplitStackIfPossible
+	);
+	
+	
 
 	
 
@@ -117,4 +131,32 @@ private:
 
 	UPROPERTY(Replicated)
 	TArray<FInventoryContainerInstance> Containers;
+	
+	void HandleDropSameContainer(
+	int32 ContainerIndex,
+	int32 SourceSlotIndex,
+	int32 DestSlotIndex,
+	int32 DragQuantity,
+	bool bSplitStackIfPossible);
+	
+	void HandleDropDifferentContainer(
+	UInventoryManagerComponent* SourceManager,
+	int32 SourceContainerIndex,
+	int32 SourceSlotIndex,
+	int32 DestContainerIndex,
+	int32 DestSlotIndex,
+	int32 DragQuantity,
+	bool bSplitStackIfPossible);
+	
+	
+	
+	bool CanStack(UInventoryItemInstance* A, UInventoryItemInstance* B) const;
+	void MoveItem(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex);
+	void SwapItems(FInventoryList& List, int32 SlotA, int32 SlotB);
+	void MergeStacks(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,  int32 DragQuantity);
+	void SplitStack(FInventoryList& List,int32 SourceSlotIndex,int32 TargetSlotIndex,int32 SplitQuantity);
+	
+	const FInventoryList& GetInventoryList(int32 ContainerIndex) const;
+	FInventoryList& GetInventoryList(int32 ContainerIndex);
+	
 };

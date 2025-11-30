@@ -154,3 +154,22 @@ UInventoryItemInstance* FInventoryList::GetItemInstanceInSlot(int32 SlotIndex) c
 	}
 	return nullptr;
 }
+
+void FInventoryList::MoveEntry(int32 SourceSlotIndex, int32 DestSlotIndex)
+{
+    for (FInventoryEntry& Entry : Entries)
+    {
+        if (Entry.SlotIndex == SourceSlotIndex)
+        {
+            const int32 OldSlot = Entry.SlotIndex;
+            Entry.SlotIndex = DestSlotIndex;
+            MarkItemDirty(Entry);
+            BroadcastChangeMessage(Entry, /*OldCount*/ INDEX_NONE, /*NewCount*/ INDEX_NONE);
+            return;
+        }
+    }
+}
+
+void FInventoryList::BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount)
+{
+}

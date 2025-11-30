@@ -20,6 +20,13 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetFromItemInstance(UInventoryItemInstance* Instance, UInventoryManagerComponent* InManager, int32 InContainerIndex, int32 InSlotIndex);
 
+    UFUNCTION(BlueprintCallable, Category="Inventory")
+    int32 GetSlotIndex() const { return SlotIndex; }
+    UFUNCTION(BlueprintCallable, Category="Inventory")
+    int32 GetContainerIndex() const { return ContainerIndex; }
+    UFUNCTION(BlueprintCallable, Category="Inventory")
+    UInventoryManagerComponent* GetManager() const { return Manager.Get(); }
+    
     UFUNCTION(BlueprintCallable)
     void ClearSlot();
 
