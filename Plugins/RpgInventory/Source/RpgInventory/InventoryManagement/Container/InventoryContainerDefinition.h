@@ -24,8 +24,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) EInventorySlotType Type = EInventorySlotType::Generic;
 
 	// Grid
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) int32 Rows = 5;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) int32 Cols = 6;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) int32 TotalSlots = 5;
 
 	// Welche Items sind erlaubt? (optional – sonst alles)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) FGameplayTagQuery AllowedItems;

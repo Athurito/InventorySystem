@@ -19,19 +19,16 @@ void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerCompon
 
     if (!Manager.IsValid())
     {
-        UE_MVVM_SET_PROPERTY_VALUE(Rows, 0);
-        UE_MVVM_SET_PROPERTY_VALUE(Cols, 0);
+        UE_MVVM_SET_PROPERTY_VALUE(TotalSlots, 0);
         Slots.Reset();
         UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(Slots);
         return;
     }
 
-    UE_MVVM_SET_PROPERTY_VALUE(Rows, Manager->GetRows(ContainerIndex));
-    UE_MVVM_SET_PROPERTY_VALUE(Cols, Manager->GetCols(ContainerIndex));
-
-    const int32 NumSlots = FMath::Max(0, Rows * Cols);
-    Slots.SetNum(NumSlots);
-    for (int32 i = 0; i < NumSlots; ++i)
+    UE_MVVM_SET_PROPERTY_VALUE(TotalSlots, Manager->GetNumSlots(ContainerIndex));
+    
+    Slots.SetNum(TotalSlots);
+    for (int32 i = 0; i < TotalSlots; ++i)
     {
         if (!Slots[i])
         {
@@ -45,7 +42,6 @@ void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerCompon
 
         if (UInventoryItemInstance* Instance = Manager->GetItemInstanceInSlot(i, ContainerIndex))
         {
-            const int32 Qty = Manager->GetQuantityInSlot(i, ContainerIndex);
             Slots[i]->SetFromItemInstance(Instance, Manager.Get(), ContainerIndex, i);
         }
         else

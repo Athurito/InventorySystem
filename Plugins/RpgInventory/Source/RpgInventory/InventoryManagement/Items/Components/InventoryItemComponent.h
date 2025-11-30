@@ -19,10 +19,7 @@ class RPGINVENTORY_API UInventoryItemComponent : public URpg_InteractableBaseCom
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-
-
-	// ---- Initialisierung (nur Server aufrufen) ----
+	
 	UFUNCTION(BlueprintCallable, Category="Inventory|Init")
 	void InitItemByDefinition(UInventoryItemDefinition* Definition);
 
@@ -31,17 +28,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Inventory|Init")
 	void InitItemBySoft(TSoftObjectPtr<UInventoryItemDefinition> Soft);
-
-	UPROPERTY(EditInstanceOnly,BlueprintReadOnly, Category="Inventory", meta=(ExposeOnSpawn))
-	TSoftObjectPtr<UInventoryItemDefinition> InitialDefinition;
 	
 	const UInventoryItemDefinition* GetItemDefinition() const { return ItemDefinition.Get(); }
-
-	// Runtime stack access via RuntimeData (single source of truth)
-	int32 GetCurrentStackCount() const;
+	
 	int32 GetMaxStackSize() const;
 	
-
 	// Attempts to consume this item according to its Consumable Fragment rules
 	bool Consume(APawn* Instigator);
 
@@ -60,16 +51,9 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_ItemId)
 	FPrimaryAssetId ItemId;
 	
-	UPROPERTY(Transient)
+	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TSoftObjectPtr<UInventoryItemDefinition> ItemDefinition;
 	
-
 	UFUNCTION()
 	void OnRep_ItemId();
-
-	UFUNCTION()
-	void OnRep_RuntimeData();
-	
-	void InitRuntimeFromDefinition(const UInventoryItemDefinition* Def);
-		
 };

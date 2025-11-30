@@ -46,8 +46,7 @@ private:
 	int32 StackCount{0};
 
 	FInv_InventoryEntry* InventoryItem{nullptr};
-
- // Owning container context for BP drag/drop
+	
 	UPROPERTY()
 	TWeakObjectPtr<UInventoryManagerComponent> OwningContainerComponent = nullptr;
 	int32 OwningContainerIndex{INDEX_NONE};

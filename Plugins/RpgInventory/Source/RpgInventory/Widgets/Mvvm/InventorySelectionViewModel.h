@@ -26,10 +26,7 @@ public:
 
     // Layoutdaten, damit die UI frei gestalten kann
     UPROPERTY(BlueprintReadOnly, FieldNotify)
-    int32 Rows = 0;
-
-    UPROPERTY(BlueprintReadOnly, FieldNotify)
-    int32 Cols = 0;
+    int32 TotalSlots = 0;
 
     // Ein ViewModel pro Slot
     UPROPERTY(BlueprintReadOnly, FieldNotify)

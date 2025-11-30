@@ -10,7 +10,6 @@
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
-#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Consumable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 #include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
 
@@ -40,29 +39,13 @@ void UInventoryItemComponent::InitItemByDefinition(UInventoryItemDefinition* Def
 	ItemDefinition = Definition;
 	ItemId   = Definition ? Definition->GetPrimaryAssetId() : FPrimaryAssetId();
 
-	InitRuntimeFromDefinition(Definition);
+	// InitRuntimeFromDefinition(Definition);
 }
 
 void UInventoryItemComponent::InitItemById(FPrimaryAssetId Id)
 {
 	check(GetOwner() && GetOwner()->HasAuthority());
-
-	ItemId = Id;
-	ItemDefinition = nullptr;
-
-	// // Optional: sofort laden, damit Stack initialisiert werden kann
-	// if (ItemId.IsValid())
-	// {
-	// 	FSoftObjectPath Path = UAssetManager::Get().GetPrimaryAssetPath(ItemId);
-	// 	if (Path.IsValid())
-	// 	{
-	// 		if (UObject* Obj = Path.TryLoad())
-	// 		{
-	// 			ItemDefinition = Cast<UInventoryItemDefinition>(Obj);
-	// 		}
-	// 	}
-	// }
-	InitRuntimeFromDefinition(ItemDefinition.Get());
+	
 }
 
 void UInventoryItemComponent::InitItemBySoft(TSoftObjectPtr<UInventoryItemDefinition> Soft)
@@ -85,134 +68,10 @@ void UInventoryItemComponent::OnRep_ItemId()
 		{
 			// ItemDefinition = Cast<UInventoryItemDefinition>(Obj);
 			// Initialize/refresh runtime data on clients when definition arrives
-			InitRuntimeFromDefinition(ItemDefinition.Get());
+			// InitRuntimeFromDefinition(ItemDefinition.Get());
 		}
 	}
 }
-
-void UInventoryItemComponent::OnRep_RuntimeData()
-{
-	// UI/FX-Refresh (Widgets, Sounds etc.) could be triggered here if needed
-}
-
-void UInventoryItemComponent::InitRuntimeFromDefinition(const UInventoryItemDefinition* Def)
-{
-	if (Def)
-	{
-		// // Initialize Stackable runtime data if definition has the fragment
-		// if (const FInventoryFragment_Stackable* Stack = Def->GetFragmentOfTypeWithTag<FInventoryFragment_Stackable>(FragmentTags::StackableFragment))
-		// {
-		// 	const int32 Max = FMath::Max(1, Stack->GetMaxStackSize());
-		//
-		// 	RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
-		// 		[&](FStackableRuntimeData& D)
-		// 		{
-		// 			// Mindestwert 1 beim Initialisieren (dein bisheriges Verhalten)
-		// 			if (D.CurrentStackCount <= 0)
-		// 			{
-		// 				D.CurrentStackCount = 1;
-		// 			}
-		// 			D.CurrentStackCount = FMath::Clamp(D.CurrentStackCount, 1, Max);
-		// 		});
-		// }
-	}
-}
-
-bool UInventoryItemComponent::Consume(APawn* Instigator)
-{
-	if (!GetOwner() || !GetOwner()->HasAuthority())
-	{
-		// auf Clients nie State ändern
-		return false;
-	}
-	if (!ItemDefinition)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Consume failed: ItemData is null"));
-		return false;
-	}
-
-	// // // const FConsumableFragment* Consumable = ItemDefinition->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment);
-	// // if (!Consumable)
-	// // {
-	// // 	UE_LOG(LogTemp, Warning, TEXT("Consume failed: No ConsumableFragment on item"));
-	// // 	return false;
-	// // }
-	//
-	// // Check runtime stack if required
-	// if (Consumable->bReduceStack)
-	// {
-	// 	const int32 Max = GetMaxStackSize();
-	//
-	// 	// Lesen: ohne Anlegen
-	// 	const FStackableRuntimeData* StackConst =
-	// 		RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
-	//
-	// 	int32 Current = StackConst ? StackConst->CurrentStackCount : 1;
-	//
-	// 	if (Current < Consumable->QuantityPerUse)
-	// 	{
-	// 		UE_LOG(LogTemp, Warning, TEXT("Consume failed: Not enough stack. Have %d, need %d"),
-	// 			   Current, Consumable->QuantityPerUse);
-	// 		return false;
-	// 	}
-	//
-	// 	const int32 NewCurrent =
-	// 		FMath::Clamp(Current - Consumable->QuantityPerUse, 0, Max);
-	//
-	// 	// Schreiben: legt bei Bedarf an und markiert automatisch dirty
-	// 	RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
-	// 		[&](FStackableRuntimeData& D)
-	// 		{
-	// 			D.CurrentStackCount = NewCurrent;
-	// 		});
-	// }
-	//
-	// // Durability not implemented yet in this module; log if requested
-	// if (Consumable->bReduceDurability)
-	// {
-	// 	UE_LOG(LogTemp, Warning, TEXT("Consume: bReduceDurability is true but durability system not implemented. Skipping wear."));
-	// }
-
-	// Helper to resolve an ASC from Instigator/Controller/PlayerState/Owner
-	auto ResolveASC = [](APawn* InInstigator, AActor* InOwner) -> UAbilitySystemComponent*
-	{
-		if (InInstigator)
-		{
-			// Pawn implements ASI
-			if (const IAbilitySystemInterface* ASIInst = Cast<IAbilitySystemInterface>(InInstigator))
-			{
-				if (UAbilitySystemComponent* C = ASIInst->GetAbilitySystemComponent()) return C;
-			}
-			// PlayerState usually holds ASC
-			if (APlayerState* PS = InInstigator->GetPlayerState())
-			{
-				if (const IAbilitySystemInterface* ASIPS = Cast<IAbilitySystemInterface>(PS))
-				{
-					if (UAbilitySystemComponent* C = ASIPS->GetAbilitySystemComponent()) return C;
-				}
-			}
-			// Controller may also implement
-			if (AController* Cntr = InInstigator->GetController())
-			{
-				if (const IAbilitySystemInterface* ASIC = Cast<IAbilitySystemInterface>(Cntr))
-				{
-					if (UAbilitySystemComponent* C = ASIC->GetAbilitySystemComponent()) return C;
-				}
-			}
-		}
-		// Fallback to owner of item component
-		if (InOwner)
-		{
-			if (const IAbilitySystemInterface* ASIOwner = Cast<IAbilitySystemInterface>(InOwner))
-			{
-				if (UAbilitySystemComponent* C = ASIOwner->GetAbilitySystemComponent()) return C;
-			}
-		}
-		return nullptr;
-	};
-	return true;
-}
-
 
 FInteractDisplayData UInventoryItemComponent::GetDisplayData_Implementation() const
 {
@@ -364,11 +223,11 @@ void UInventoryItemComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// Level-platziert: Server übernimmt InitialDefinition einmalig
-	if (GetOwner() && GetOwner()->HasAuthority() && InitialDefinition.IsValid())
-	{
-		UInventoryItemDefinition* Def = InitialDefinition.Get();
-		if (!Def) Def = InitialDefinition.LoadSynchronous();
-		InitItemByDefinition(Def);
-	}
+	// if (GetOwner() && GetOwner()->HasAuthority() && InitialDefinition.IsValid())
+	// {
+	// 	UInventoryItemDefinition* Def = InitialDefinition.Get();
+	// 	if (!Def) Def = InitialDefinition.LoadSynchronous();
+	// 	InitItemByDefinition(Def);
+	// }
 }
 

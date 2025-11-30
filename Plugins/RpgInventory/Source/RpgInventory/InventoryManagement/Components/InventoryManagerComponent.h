@@ -45,7 +45,7 @@ struct FInventoryContainerInstance
 	
 	int32 GetNumSlots() const
 	{
-		return Definition ? Definition->Rows * Definition->Cols : 0;
+		return Definition ? Definition->TotalSlots : 0;
 	}
 
 	bool IsValidSlot(int32 SlotIndex) const
@@ -75,24 +75,16 @@ public:
     
     void InitializeContainers();
     void AddRepSubObject(UObject* SubObject);
-
-    // Broadcastet eine Slotänderung für einen bestimmten Container
+	
     void BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const;
 
     UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const;
-    
-    // --- UI‑freundliche Getter für ViewModels ---
+	
     int32 GetNumContainers() const { return Containers.Num(); }
-    int32 GetRows(int32 ContainerIndex) const
+    int32 GetNumSlots(int32 ContainerIndex) const
     {
         return (Containers.IsValidIndex(ContainerIndex) && Containers[ContainerIndex].Definition)
-            ? Containers[ContainerIndex].Definition->Rows
-            : 0;
-    }
-    int32 GetCols(int32 ContainerIndex) const
-    {
-        return (Containers.IsValidIndex(ContainerIndex) && Containers[ContainerIndex].Definition)
-            ? Containers[ContainerIndex].Definition->Cols
+            ? Containers[ContainerIndex].GetNumSlots()
             : 0;
     }
     // Aktuelle Menge im Slot (falls keine Stack‑Info vorhanden, mindestens 1 bei belegtem Slot)
