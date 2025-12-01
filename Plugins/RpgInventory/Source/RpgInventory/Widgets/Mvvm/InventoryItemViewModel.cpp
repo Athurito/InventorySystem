@@ -28,7 +28,12 @@ void UInventoryItemViewModel::SetFromItemInstance(UInventoryItemInstance* Instan
 void UInventoryItemViewModel::ClearSlot()
 {
     UE_MVVM_SET_PROPERTY_VALUE(ItemInstance, nullptr);
+    UE_MVVM_SET_PROPERTY_VALUE(DisplayName, FText::GetEmpty());
+    UE_MVVM_SET_PROPERTY_VALUE(Icon, TSoftObjectPtr<UTexture2D>()); // leerer SoftPtr
+    UE_MVVM_SET_PROPERTY_VALUE(DurabilityCurrent, 0);
+    UE_MVVM_SET_PROPERTY_VALUE(DurabilityMax, 0);
     UE_MVVM_SET_PROPERTY_VALUE(CurrentStackCount, 0);
+    UE_MVVM_SET_PROPERTY_VALUE(MaxStackSize, 0);
     UE_MVVM_SET_PROPERTY_VALUE(bIsEmpty, true);
 }
 

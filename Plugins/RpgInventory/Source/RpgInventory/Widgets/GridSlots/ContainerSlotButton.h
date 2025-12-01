@@ -37,8 +37,6 @@ public:
 	UInventoryManagerComponent* GetOwningContainerComponent() const;
 	UFUNCTION(BlueprintPure, Category="Inventory|UI")
 	int32 GetOwningContainerIndex() const { return OwningContainerIndex; }
-	UFUNCTION(BlueprintCallable, Category="Inventory|UI")
-	void InitializeSlotContext(UInventoryManagerComponent* InComponent, int32 InContainerIndex);
 
 private:
 	
@@ -51,8 +49,5 @@ private:
 	TWeakObjectPtr<UInventoryManagerComponent> OwningContainerComponent = nullptr;
 	int32 OwningContainerIndex{INDEX_NONE};
 
-    UFUNCTION()
-    void HandleSlotChanged(int32 ChangedContainerIndex, int32 ChangedSlotIndex);
-    void RefreshSlot();
-    void ClearSlot();
+ 
 };
