@@ -24,6 +24,11 @@ void UInventoryItemInstance::AddStatTagStack(FGameplayTag Tag, int32 StackCount)
 	StatTags.AddStack(Tag, StackCount);
 }
 
+void UInventoryItemInstance::SetStatTagStackCount(FGameplayTag Tag, int32 NewCount)
+{
+	StatTags.SetStackCount(Tag, NewCount);
+}
+
 void UInventoryItemInstance::RemoveStatTagStack(FGameplayTag Tag, int32 StackCount)
 {
 	StatTags.RemoveStack(Tag, StackCount);

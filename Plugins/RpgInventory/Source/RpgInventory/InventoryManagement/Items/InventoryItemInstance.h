@@ -30,6 +30,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category=Inventory)
 	void AddStatTagStack(FGameplayTag Tag, int32 StackCount);
 
+	void SetStatTagStackCount(FGameplayTag Tag, int32 NewCount);
+	
 	// Removes a specified number of stacks from the tag (does nothing if StackCount is below 1)
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category= Inventory)
 	void RemoveStatTagStack(FGameplayTag Tag, int32 StackCount);

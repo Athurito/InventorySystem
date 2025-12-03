@@ -36,6 +36,36 @@ void FGameplayTagStackContainer::AddStack(FGameplayTag Tag, int32 StackCount)
 	}
 }
 
+void FGameplayTagStackContainer::SetStackCount(FGameplayTag Tag, int32 NewCount)
+{
+	const int32 OldCount = GetStackCount(Tag);
+
+	if (NewCount <= 0)
+	{
+		RemoveStack(Tag, OldCount);
+		return;
+	}
+
+	const int32 Delta = NewCount - OldCount;
+	if (Delta > 0)
+	{
+		AddStack(Tag, Delta);
+	}
+	else if (Delta < 0)
+	{
+		RemoveStack(Tag, -Delta);
+	}
+}
+
+int32 FGameplayTagStackContainer::GetStackCount(FGameplayTag Tag) const
+{
+	if (const int32* Found = TagToCountMap.Find(Tag))
+	{
+		return *Found;
+	}
+	return 0;
+}
+
 void FGameplayTagStackContainer::RemoveStack(FGameplayTag Tag, int32 StackCount)
 {
 	if (!Tag.IsValid())

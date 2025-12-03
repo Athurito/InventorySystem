@@ -339,8 +339,8 @@ void UInventoryManagerComponent::MergeStacks(FInventoryList& List, int32 SourceS
 
 	const int32 ActuallyMoved = FMath::Min(AmountToMove, FreeSpace);
 
-	SourceItem->AddStatTagStack(FragmentTags::StackableFragment, SourceCount - ActuallyMoved);
-	DestItem->AddStatTagStack(FragmentTags::StackableFragment, DestCount + ActuallyMoved);
+	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - ActuallyMoved);
+	DestItem->SetStatTagStackCount(FragmentTags::StackableFragment, DestCount + ActuallyMoved);
 
 	// Wenn Source leer geworden ist, Eintrag löschen
 	
@@ -365,7 +365,10 @@ void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 SourceSl
 	// Neue Instance mit gleicher Def
 	UInventoryItemDefinition* Def = SourceItem->GetItemDefinition();
 	UInventoryItemInstance* NewInstance = List.AddEntry(Def, TargetSlotIndex, SplitQuantity);
-	SourceItem->AddStatTagStack(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
+	//SourceItem->AddStatTagStack(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
+	
+	
+	SourceItem->SetStatTagStackCount( FragmentTags::StackableFragment, SourceCount - SplitQuantity);
 	//SetStackCount(SourceItem, SourceCount - SplitQuantity);
 
 	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && NewInstance)

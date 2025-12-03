@@ -61,11 +61,9 @@ public:
 	void RemoveStack(FGameplayTag Tag, int32 StackCount);
 
 	// Returns the stack count of the specified tag (or 0 if the tag is not present)
-	int32 GetStackCount(FGameplayTag Tag) const
-	{
-		return TagToCountMap.FindRef(Tag);
-	}
-
+	int32 GetStackCount(FGameplayTag Tag) const;
+	
+	void SetStackCount(FGameplayTag Tag, int32 NewCount);
 	// Returns true if there is at least one stack of the specified tag
 	bool ContainsTag(FGameplayTag Tag) const
 	{

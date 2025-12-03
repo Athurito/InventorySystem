@@ -29,6 +29,9 @@ struct FInventoryDragPayload
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 Quantity = 0;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bIsShiftDown = false;
 };
 
 USTRUCT()
