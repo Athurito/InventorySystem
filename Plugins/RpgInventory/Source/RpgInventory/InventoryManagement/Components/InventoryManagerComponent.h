@@ -10,6 +10,15 @@
 
 struct FInvSlotArray;
 
+UENUM(BlueprintType)
+enum EInventoryClickAction : uint8
+{
+	None,
+	ContainerSplit,
+	ContainerMerge,
+	ContainerESort
+};
+
 USTRUCT(BlueprintType)
 struct FInventoryDragPayload
 {
@@ -31,7 +40,7 @@ struct FInventoryDragPayload
 	int32 Quantity = 0;
 	
 	UPROPERTY(BlueprintReadWrite)
-	bool bIsShiftDown = false;
+	FGameplayTag OperationType = FGameplayTag::EmptyTag;
 };
 
 USTRUCT()
@@ -89,8 +98,6 @@ public:
             ? Containers[ContainerIndex].GetNumSlots()
             : 0;
     }
-    // Aktuelle Menge im Slot (falls keine Stack‑Info vorhanden, mindestens 1 bei belegtem Slot)
-    int32 GetQuantityInSlot(int32 SlotIndex, int32 ContainerIndex) const;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
@@ -107,6 +114,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	TArray<UInventoryItemInstance*> GetAllItems(int32 ContainerIndex) const;
 	
+	UFUNCTION(BlueprintCallable,Category="Inventory")
+	void SetInventoryClickAction(EInventoryClickAction Action);
+	UFUNCTION(BlueprintCallable,Category="Inventory")
+	EInventoryClickAction GetInventoryClickAction() const;
+	
 	
 	//Drag drop..
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory|DragDrop")
@@ -117,7 +129,7 @@ public:
 		int32 TargetContainerIndex,
 		int32 TargetSlotIndex,
 		int32 DragQuantity,
-		bool bSplitStackIfPossible
+		FGameplayTag OperationType
 	);
 	
 	
@@ -129,6 +141,8 @@ protected:
 
 private:
 
+	EInventoryClickAction InventoryClickAction = EInventoryClickAction::None;
+	
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TArray<TObjectPtr<UInventoryContainerDefinition>> DefaultContainerDefinitions;
 
@@ -140,7 +154,7 @@ private:
 	int32 SourceSlotIndex,
 	int32 DestSlotIndex,
 	int32 DragQuantity,
-	bool bSplitStackIfPossible);
+	FGameplayTag OperationType);
 	
 	void HandleDropDifferentContainer(
 	UInventoryManagerComponent* SourceManager,
@@ -149,7 +163,7 @@ private:
 	int32 DestContainerIndex,
 	int32 DestSlotIndex,
 	int32 DragQuantity,
-	bool bSplitStackIfPossible);
+	FGameplayTag OperationType);
 	
 	
 	

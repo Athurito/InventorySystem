@@ -10,6 +10,12 @@ class UInventoryManagerComponent;
 class UUniformGridPanel;
 struct FInv_InventoryEntry;
 
+UENUM(BlueprintType)
+enum class EInventorySourceType : uint8
+{
+	Player      UMETA(DisplayName="Player Inventory"),
+	Storage     UMETA(DisplayName="Storage Container")
+};
 
 UCLASS()
 class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
@@ -17,51 +23,25 @@ class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
 	GENERATED_BODY()
 
 public:
-	// Verknüpft dieses Grid mit einer ContainerComponent und einem ContainerIndex (z. B. 0 = Player-Inventory)
-	UFUNCTION(BlueprintCallable, Category="Container|UI")
-	void BindToContainer(UInventoryManagerComponent* InComponent, int32 InContainerIndex);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Container|UI")
+	EInventorySourceType SourceType = EInventorySourceType::Player;
+	
+	UPROPERTY(BlueprintReadWrite, Category="Container|UI")
+	TWeakObjectPtr<UInventoryManagerComponent> StorageManager;
+	
+	// Helfer für den Resolver:
+	UFUNCTION(BlueprintPure, Category="Container|UI")
+	UInventoryManagerComponent* ResolveManagerForViewModel() const;
 
-	// Liefert die in der Definition hinterlegte Zeilen-/Spaltenanzahl
 	UFUNCTION(BlueprintPure, Category="Container|UI")
-	int32 GetRows() const { return CachedRows; }
-	UFUNCTION(BlueprintPure, Category="Container|UI")
-	int32 GetCols() const { return CachedCols; }
-	UFUNCTION(BlueprintPure, Category="Container|UI")
-	int32 GetTotalSlots() const { return CachedRows * CachedCols; }
+	int32 ResolveContainerIndexForViewModel() const;
+	
+	UPROPERTY(BlueprintReadWrite, Category="Container|UI")
+	int32 StorageContainerIndex = 0;
 
-	// Optional: Zugriff auf die gebundene Komponente und den Index
-	UFUNCTION(BlueprintPure, Category="Container|UI")
-	UInventoryManagerComponent* GetBoundComponent() const { return ContainerComponent.Get(); }
-	UFUNCTION(BlueprintPure, Category="Container|UI")
-	int32 GetBoundContainerIndex() const { return ContainerIndex; }
-
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Container|UI")
+	int32 PlayerContainerIndex = 0;
+	
 protected:
 	virtual void NativeDestruct() override;
-
-private:
-	void UnbindFromCurrent() const;
-	UFUNCTION()
-	void HandleEntryChanged(FGuid InstanceId, const FInventoryEntry& Entry);
-	void BindDelegates();
-
-	// Neu: Cache der Slot-Widgets nach Index
-	UPROPERTY()
-	TArray<TObjectPtr<UContainerSlotButton>> SlotWidgets;
-
-	// Neu: Handler für präzise Slot-Änderungen (Delegate aus Component)
-	UFUNCTION()
-	void HandleSlotChanged(int32 ContainerIdx, int32 SlotIdx, FGuid InstanceId);
-
-	// Neu: Hilfsfunktion für 1-Slot-Update
-	void UpdateOneSlot(int32 SlotIdx);
-	
-	
-	TWeakObjectPtr<UInventoryManagerComponent> ContainerComponent;
-	int32 ContainerIndex = INDEX_NONE;
-	int32 CachedRows = 0;
-	int32 CachedCols = 0;
-	
-	// Entry-Klasse für jeden Slot (Button/Widget). Im Editor setzbar.
-	UPROPERTY(EditDefaultsOnly, Category="Container|UI")
-	TSubclassOf<UContainerSlotButton> SlotButtonClass;
 };

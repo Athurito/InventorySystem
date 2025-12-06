@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
+#include "RpgInventory/InventoryManagement/GameplayTags/InventoryOperationTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 
@@ -100,9 +101,19 @@ TArray<UInventoryItemInstance*> UInventoryManagerComponent::GetAllItems(int32 Co
     return Containers[ContainerIndex].InventoryList.GetAllItems();
 }
 
+void UInventoryManagerComponent::SetInventoryClickAction(EInventoryClickAction Action)
+{
+	InventoryClickAction = Action;
+}
+
+EInventoryClickAction UInventoryManagerComponent::GetInventoryClickAction() const
+{
+	return InventoryClickAction;
+}
+
 void UInventoryManagerComponent::HandleDrop(UInventoryManagerComponent* SourceManager, int32 SourceContainerIndex,
-	int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity,
-	bool bSplitStackIfPossible)
+                                            int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity,
+                                            FGameplayTag OperationType)
 {
 	if (!SourceManager)
 	{
@@ -115,23 +126,12 @@ void UInventoryManagerComponent::HandleDrop(UInventoryManagerComponent* SourceMa
 
 	if (bSameContainer)
 	{
-		HandleDropSameContainer(SourceContainerIndex, SourceSlotIndex, TargetSlotIndex, DragQuantity, bSplitStackIfPossible);
+		HandleDropSameContainer(SourceContainerIndex, SourceSlotIndex, TargetSlotIndex, DragQuantity, OperationType);
 	}
 	else
 	{
-		HandleDropDifferentContainer(SourceManager, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, bSplitStackIfPossible);
+		HandleDropDifferentContainer(SourceManager, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, OperationType);
 	}
-}
-
-int32 UInventoryManagerComponent::GetQuantityInSlot(int32 SlotIndex, int32 ContainerIndex) const
-{
-    UInventoryItemInstance* Instance = GetItemInstanceInSlot(SlotIndex, ContainerIndex);
-    if (!Instance)
-    {
-        return 0;
-    }
-    // TODO: Echte Stackmenge aus Fragments/Tags lesen
-    return 1;
 }
 
 void UInventoryManagerComponent::BeginPlay()
@@ -143,7 +143,7 @@ void UInventoryManagerComponent::BeginPlay()
 }
 
 void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, int32 SourceSlotIndex,
-	int32 DestSlotIndex, int32 DragQuantity, bool bSplitStackIfPossible)
+	int32 DestSlotIndex, int32 DragQuantity, FGameplayTag OperationType)
 {
 	if (SourceSlotIndex == DestSlotIndex)
 	{
@@ -163,7 +163,7 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 	// 1) Ziel leer → Move oder Split
 	if (!DestItem)
 	{
-		if (bSplitStackIfPossible && DragQuantity > 0 && DragQuantity < SourceItem->GetStatTagStackCount( FragmentTags::StackableFragment))
+		if (OperationType.MatchesTagExact(RpgTags::InventoryOperation_SplitOperation) && DragQuantity > 0 && DragQuantity < SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment))
 		{
 			SplitStack(List, SourceSlotIndex, DestSlotIndex, DragQuantity);
 		}
@@ -187,7 +187,7 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 
 void UInventoryManagerComponent::HandleDropDifferentContainer(UInventoryManagerComponent* SourceManager,
 	int32 SourceContainerIndex, int32 SourceSlotIndex, int32 DestContainerIndex, int32 DestSlotIndex,
-	int32 DragQuantity, bool bSplitStackIfPossible)
+	int32 DragQuantity, FGameplayTag OperationType)
 {
 	if (!SourceManager) return;
 
