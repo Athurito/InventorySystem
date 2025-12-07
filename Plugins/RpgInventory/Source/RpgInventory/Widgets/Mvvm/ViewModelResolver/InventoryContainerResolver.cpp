@@ -3,13 +3,11 @@
 
 #include "InventoryContainerResolver.h"
 
-#include "GameFramework/PlayerState.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/Widgets/Grid/ContainerGrid.h"
 #include "RpgInventory/Widgets/Mvvm/InventorySelectionViewModel.h"
 
-UObject* UInventoryContainerResolver::CreateInstance(const UClass* ExpectedType, const UUserWidget* UserWidget,
-                                                     const UMVVMView* View) const
+UObject* UInventoryContainerResolver::CreateInstance(const UClass* ExpectedType, const UUserWidget* UserWidget, const UMVVMView* View) const
 {
 	if (!ExpectedType || !ExpectedType->IsChildOf(UInventorySelectionViewModel::StaticClass()))
 	{

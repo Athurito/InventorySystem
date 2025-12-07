@@ -8,7 +8,7 @@
 #include "Rpg_InteractableComponent.generated.h"
 
 class APawn;
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteraction, AActor*, NewTarget);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteraction, AActor*, Instigator);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API URpg_InteractableComponent : public UActorComponent, public IInteractable

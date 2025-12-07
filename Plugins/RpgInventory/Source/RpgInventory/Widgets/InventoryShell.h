@@ -6,17 +6,9 @@
 #include "CommonActivatableWidget.h"
 #include "InventoryShell.generated.h"
 
-class UPlayerInventory;
-class UCommonTabListWidgetBase;
-class UContainerGrid;
-class UInventoryManagerComponent;
 class UWidget;
 class UOverlay;
 
-/**
- * InventoryShell hält dauerhaft das Player-Inventory sichtbar und zeigt dynamisch
- * zusätzlich eine kontextuelle UI (z. B. Storage-Container, Crafting etc.).
- */
 UCLASS()
 class RPGINVENTORY_API UInventoryShell : public UCommonActivatableWidget
 {
@@ -36,14 +28,12 @@ private:
 	void ApplyContextWidget() const;
 	
 	UPROPERTY(meta=(BindWidget))
-	TObjectPtr<UPlayerInventory> PlayerInventory = nullptr;
+	TObjectPtr<UWidget> PlayerInventory = nullptr;
 
 	// Root für dynamische Zusatz-UI (z. B. Overlay/SizeBox/VerticalBox)
 	UPROPERTY(meta=(BindWidget))
 	TObjectPtr<UOverlay> DynamicContentRoot = nullptr;
-
 	
-
 	UPROPERTY(Transient)
 	TObjectPtr<UWidget> ActiveContextWidget = nullptr;
 };
