@@ -98,8 +98,6 @@ public:
 
 	void MoveEntry(int32 SourceSlotIndex, int32 DestSlotIndex);
 
-private:
-	void BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount);
 
 private:
     friend UInventoryManagerComponent;

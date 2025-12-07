@@ -62,8 +62,18 @@ void UInventorySelectionViewModel::OnManagerSlotChanged(int32 ChangedContainer, 
 {
     if (!Manager.IsValid()) return;
     if (ChangedContainer != ContainerIndex) return;
-    if (!Slots.IsValidIndex(SlotIndex)) return;
+    
+    
+    // Wenn die Liste gerade erst angekommen ist und wir noch keine Slots haben:
+    const int32 NumSlotsNow = Manager->GetNumSlots(ContainerIndex);
+    if (Slots.Num() != NumSlotsNow)
+    {
+        InitializeFromManager(Manager.Get(), ContainerIndex);
+        return;
+    }
 
+    if (!Slots.IsValidIndex(SlotIndex)) return;
+    
     UInventoryItemViewModel* VM = Slots[SlotIndex];
     if (!VM) return;
 

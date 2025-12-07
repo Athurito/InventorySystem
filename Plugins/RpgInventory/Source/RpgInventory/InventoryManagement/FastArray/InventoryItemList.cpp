@@ -84,8 +84,7 @@ UInventoryItemInstance* FInventoryList::AddEntry(UInventoryItemDefinition* ItemD
     
     FInventoryEntry& NewEntry = Entries.AddDefaulted_GetRef();
     NewEntry.SlotIndex = SlotIndex;
-    AActor* Owner = OwnerComponent->GetOwner();
-    NewEntry.Instance = NewObject<UInventoryItemInstance>(Owner);
+    NewEntry.Instance = NewObject<UInventoryItemInstance>(OwnerActor);
 	NewEntry.Instance->SetItemDef(ItemDefinition);
 
 	for (UInventoryItemFragment* Fragment : ItemDefinition->GetFragments())
@@ -164,12 +163,7 @@ void FInventoryList::MoveEntry(int32 SourceSlotIndex, int32 DestSlotIndex)
             const int32 OldSlot = Entry.SlotIndex;
             Entry.SlotIndex = DestSlotIndex;
             MarkItemDirty(Entry);
-            BroadcastChangeMessage(Entry, /*OldCount*/ INDEX_NONE, /*NewCount*/ INDEX_NONE);
             return;
         }
     }
-}
-
-void FInventoryList::BroadcastChangeMessage(FInventoryEntry& Entry, int32 OldCount, int32 NewCount)
-{
 }

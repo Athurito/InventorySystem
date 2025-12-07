@@ -146,8 +146,11 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TArray<TObjectPtr<UInventoryContainerDefinition>> DefaultContainerDefinitions;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_Containers)
 	TArray<FInventoryContainerInstance> Containers;
+	
+	UFUNCTION()
+	void OnRep_Containers();
 	
 	void HandleDropSameContainer(
 	int32 ContainerIndex,
@@ -160,10 +163,48 @@ private:
 	UInventoryManagerComponent* SourceManager,
 	int32 SourceContainerIndex,
 	int32 SourceSlotIndex,
-	int32 DestContainerIndex,
-	int32 DestSlotIndex,
+	int32 TargetContainerIndex,
+	int32 TargetSlotIndex,
 	int32 DragQuantity,
 	FGameplayTag OperationType);
+	
+	void MoveItemAcrossContainers(
+	UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList,
+	int32 SourceContainerIndex,
+	int32 SourceSlotIndex,
+	FInventoryList& DestList,
+	int32 DestContainerIndex,
+	int32 DestSlotIndex);
+	
+	void SplitStackAcrossContainers(
+	UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList,
+	int32 SourceContainerIndex,
+	int32 SourceSlotIndex,
+	FInventoryList& DestList,
+	int32 DestContainerIndex,
+	int32 DestSlotIndex,
+	int32 SplitQuantity);
+	
+	void MergeStacksAcrossContainers(
+	UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList,
+	int32 SourceContainerIndex,
+	int32 SourceSlotIndex,
+	FInventoryList& DestList,
+	int32 DestContainerIndex,
+	int32 DestSlotIndex,
+	int32 DragQuantity);
+	
+	void SwapItemsAcrossContainers(
+	UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList,
+	int32 SourceContainerIndex,
+	int32 SourceSlotIndex,
+	FInventoryList& DestList,
+	int32 DestContainerIndex,
+	int32 DestSlotIndex);
 	
 	
 	
@@ -172,6 +213,9 @@ private:
 	void SwapItems(FInventoryList& List, int32 SlotA, int32 SlotB);
 	void MergeStacks(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,  int32 DragQuantity);
 	void SplitStack(FInventoryList& List,int32 SourceSlotIndex,int32 TargetSlotIndex,int32 SplitQuantity);
+	
+	bool CanPlaceInContainer(UInventoryItemInstance* SourceItem, int32 TargetContainerIndex, int32 TargetSlotIndex) const;
+	
 	
 	const FInventoryList& GetInventoryList(int32 ContainerIndex) const;
 	FInventoryList& GetInventoryList(int32 ContainerIndex);

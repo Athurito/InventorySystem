@@ -47,6 +47,10 @@ void UInventoryManagerComponent::AddRepSubObject(UObject* SubObject)
 
 void UInventoryManagerComponent::BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const
 {
+	const bool bAuth = GetOwner() && GetOwner()->HasAuthority();
+	UE_LOG(LogTemp, Warning, TEXT("SlotChanged C=%d S=%d  Auth=%d"),
+		ContainerIndex, SlotIndex, bAuth ? 1 : 0);
+
     OnInventorySlotChanged.Broadcast(ContainerIndex, SlotIndex);
 }
 
@@ -142,8 +146,17 @@ void UInventoryManagerComponent::BeginPlay()
 	InitializeContainers();
 }
 
+void UInventoryManagerComponent::OnRep_Containers()
+{
+	for (int32 i = 0; i < Containers.Num(); ++i)
+	{
+		Containers[i].InventoryList.OwnerComponent = this;
+		Containers[i].InventoryList.ContainerIndex = i;
+	}
+}
+
 void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, int32 SourceSlotIndex,
-	int32 DestSlotIndex, int32 DragQuantity, FGameplayTag OperationType)
+                                                         int32 DestSlotIndex, int32 DragQuantity, FGameplayTag OperationType)
 {
 	if (SourceSlotIndex == DestSlotIndex)
 	{
@@ -186,52 +199,232 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 }
 
 void UInventoryManagerComponent::HandleDropDifferentContainer(UInventoryManagerComponent* SourceManager,
-	int32 SourceContainerIndex, int32 SourceSlotIndex, int32 DestContainerIndex, int32 DestSlotIndex,
+	int32 SourceContainerIndex, int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex,
 	int32 DragQuantity, FGameplayTag OperationType)
 {
 	if (!SourceManager) return;
 
 	FInventoryList& SourceList = SourceManager->GetInventoryList(SourceContainerIndex);
-	FInventoryList& DestList   = GetInventoryList(DestContainerIndex);
+	FInventoryList& DestList   = GetInventoryList(TargetContainerIndex);
 
 	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(DestSlotIndex);
+	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(TargetSlotIndex);
 
 	if (!SourceItem)
 	{
 		return;
 	}
 
-	// Optional: TagQuery / ContainerDefinition prüfen
-	// if (!CanPlaceInContainer(SourceItem, DestContainerIndex, DestSlotIndex)) return;
+	//Optional: TagQuery / ContainerDefinition prüfen
+	if (!CanPlaceInContainer(SourceItem, TargetContainerIndex, TargetSlotIndex)) return;
 
-	// 1) Ziel leer → Move / Split über zwei Listen
-	// if (!DestItem)
-	// {
-	// 	if (bSplitStackIfPossible && DragQuantity > 0 && DragQuantity < SourceManager->GetStackCount(SourceItem))
-	// 	{
-	// 		SplitStackAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
-	// 								   DestList, DestContainerIndex, DestSlotIndex, DragQuantity);
-	// 	}
-	// 	else
-	// 	{
-	// 		MoveItemAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
-	// 								 DestList, DestContainerIndex, DestSlotIndex);
-	// 	}
-	// 	return;
-	// }
-	//
-	// // 2) Ziel belegt → Stack oder Swap über zwei Container
-	// if (CanStack(SourceItem, DestItem))
-	// {
-	// 	MergeStacksAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
-	// 								DestList, DestContainerIndex, DestSlotIndex, DragQuantity);
-	// }
-	// else
-	// {
-	// 	SwapItemsAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
-	// 							  DestList, DestContainerIndex, DestSlotIndex);
-	// }
+	//1) Ziel leer → Move / Split über zwei Listen
+	if (!DestItem)
+	{
+		if (OperationType.MatchesTagExact(RpgTags::InventoryOperation_SplitOperation) && DragQuantity > 0 && DragQuantity < SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment))
+		{
+			SplitStackAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
+									   DestList, TargetContainerIndex, TargetSlotIndex, DragQuantity);
+		}
+		else
+		{
+			MoveItemAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
+									 DestList, TargetContainerIndex, TargetSlotIndex);
+		}
+		return;
+	}
+	
+	// 2) Ziel belegt → Stack oder Swap über zwei Container
+	if (CanStack(SourceItem, DestItem))
+	{
+		MergeStacksAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
+									DestList, TargetContainerIndex, TargetSlotIndex, DragQuantity);
+	}
+	else
+	{
+		SwapItemsAcrossContainers(SourceManager, SourceList, SourceContainerIndex, SourceSlotIndex,
+								  DestList, TargetContainerIndex, TargetSlotIndex);
+	}
+}
+
+void UInventoryManagerComponent::MoveItemAcrossContainers(UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
+	int32 DestContainerIndex, int32 DestSlotIndex)
+{
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	if (!SourceItem)
+	{
+		return;
+	}
+
+	// SourceList: Eintrag entfernen
+	SourceList.RemoveEntry(SourceItem);
+
+	// Rep: Aus SourceManager austragen
+	if (SourceManager->IsUsingRegisteredSubObjectList())
+	{
+		SourceManager->RemoveReplicatedSubObject(SourceItem);
+	}
+
+	// DestList: Instanz im Zielslot hinzufügen
+	DestList.AddEntry(SourceItem, DestSlotIndex);
+
+	// Rep: beim Zielmanager registrieren
+	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication())
+	{
+		AddReplicatedSubObject(SourceItem);
+	}
+
+	// UI informieren
+	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+}
+
+void UInventoryManagerComponent::SplitStackAcrossContainers(UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
+	int32 DestContainerIndex, int32 DestSlotIndex, int32 SplitQuantity)
+{
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	if (!SourceItem)
+	{
+		return;
+	}
+
+	const int32 SourceCount = SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment);
+	if (SplitQuantity <= 0 || SplitQuantity >= SourceCount)
+	{
+		return;
+	}
+
+	UInventoryItemDefinition* Def = SourceItem->GetItemDefinition();
+
+	// Neue Instanz im Zielcontainer, zunächst mit 0 Stack
+	UInventoryItemInstance* NewInstance = DestList.AddEntry(Def, DestSlotIndex, /*InitialStack*/ 0);
+
+	// Stackwerte ABSOLUT setzen
+	
+	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
+	NewInstance->SetStatTagStackCount(FragmentTags::StackableFragment, SplitQuantity);
+
+	// Rep: neue Instanz beim Zielmanager registrieren
+	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && NewInstance)
+	{
+		AddReplicatedSubObject(NewInstance);
+	}
+
+	// UI informieren
+	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+}
+
+void UInventoryManagerComponent::MergeStacksAcrossContainers(UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
+	int32 DestContainerIndex, int32 DestSlotIndex, int32 DragQuantity)
+{
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* TargetItem   = DestList.GetItemInstanceInSlot(DestSlotIndex);
+
+	if (!SourceItem || !TargetItem)
+	{
+		return;
+	}
+
+	const UInventoryFragment_Stackable* StackFrag = SourceItem->FindFragmentByClass<UInventoryFragment_Stackable>();
+	if (!StackFrag)
+	{
+		return;
+	}
+
+	const int32 MaxStack = StackFrag->GetMaxStackSize();
+
+	int32 SourceCount = SourceItem->GetStatTagStackCount( FragmentTags::StackableFragment);
+	int32 TargetCount   = TargetItem->GetStatTagStackCount( FragmentTags::StackableFragment);
+
+	if (SourceCount <= 0)
+	{
+		return;
+	}
+
+	int32 AmountToMove = (DragQuantity > 0) ? FMath::Min(DragQuantity, SourceCount) : SourceCount;
+	int32 FreeSpace    = MaxStack - TargetCount;
+
+	if (FreeSpace <= 0)
+	{
+		return;
+	}
+
+	const int32 ActuallyMoved = FMath::Min(AmountToMove, FreeSpace);
+	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - ActuallyMoved);
+	TargetItem->SetStatTagStackCount(FragmentTags::StackableFragment, TargetCount + ActuallyMoved);
+
+	// Wenn Source leer, Eintrag & Rep entfernen
+	if (SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment) <= 0)
+	{
+		SourceList.RemoveEntry(SourceItem);
+		if (SourceManager->IsUsingRegisteredSubObjectList())
+		{
+			SourceManager->RemoveReplicatedSubObject(SourceItem);
+		}
+	}
+
+	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+}
+
+void UInventoryManagerComponent::SwapItemsAcrossContainers(UInventoryManagerComponent* SourceManager,
+	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
+	int32 DestContainerIndex, int32 DestSlotIndex)
+{
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(DestSlotIndex);
+
+	if (!SourceItem && !DestItem)
+	{
+		return;
+	}
+
+	// Entfernen aus aktuellen Listen
+	if (SourceItem)
+	{
+		SourceList.RemoveEntry(SourceItem);
+	}
+	if (DestItem)
+	{
+		DestList.RemoveEntry(DestItem);
+	}
+
+	// Rep: Subobjects abmelden
+	if (SourceItem && SourceManager->IsUsingRegisteredSubObjectList())
+	{
+		SourceManager->RemoveReplicatedSubObject(SourceItem);
+	}
+	if (DestItem && IsUsingRegisteredSubObjectList())
+	{
+		RemoveReplicatedSubObject(DestItem);
+	}
+
+	// Einfügen in jeweils andere Liste
+	if (SourceItem)
+	{
+		DestList.AddEntry(SourceItem, DestSlotIndex);
+		if (IsUsingRegisteredSubObjectList() && IsReadyForReplication())
+		{
+			AddReplicatedSubObject(SourceItem);
+		}
+	}
+
+	if (DestItem)
+	{
+		SourceList.AddEntry(DestItem, SourceSlotIndex);
+		if (SourceManager->IsUsingRegisteredSubObjectList() && SourceManager->IsReadyForReplication())
+		{
+			SourceManager->AddReplicatedSubObject(DestItem);
+		}
+	}
+
+	// UI-Updates
+	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
 }
 
 bool UInventoryManagerComponent::CanStack(UInventoryItemInstance* A, UInventoryItemInstance* B) const
@@ -282,8 +475,8 @@ void UInventoryManagerComponent::MoveItem(FInventoryList& List, int32 SourceSlot
 	List.MoveEntry(SourceSlotIndex, TargetSlotIndex);
 
 	// UI informieren:
-	BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
 }
 
 void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 SlotA, int32 SlotB)
@@ -309,8 +502,8 @@ void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 SlotA, in
 	if (EntryA) { EntryA->SlotIndex = SlotB; List.MarkItemDirty(*EntryA); }
 	if (EntryB) { EntryB->SlotIndex = SlotA; List.MarkItemDirty(*EntryB); }
 
-	BroadcastSlotChanged(List.ContainerIndex, SlotA);
-	BroadcastSlotChanged(List.ContainerIndex, SlotB);
+	// BroadcastSlotChanged(List.ContainerIndex, SlotA);
+	// BroadcastSlotChanged(List.ContainerIndex, SlotB);
 }
 
 void UInventoryManagerComponent::MergeStacks(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,
@@ -349,8 +542,8 @@ void UInventoryManagerComponent::MergeStacks(FInventoryList& List, int32 SourceS
 		List.RemoveEntry(SourceItem);
 	}
 
-	BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
 }
 
 void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,
@@ -376,8 +569,16 @@ void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 SourceSl
 		AddReplicatedSubObject(NewInstance);
 	}
 
-	BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
+	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+}
+
+bool UInventoryManagerComponent::CanPlaceInContainer(UInventoryItemInstance* SourceItem, int32 TargetContainerIndex,
+	int32 TargetSlotIndex) const
+{
+	if (!SourceItem) return false;
+	
+	return true;
 }
 
 const FInventoryList& UInventoryManagerComponent::GetInventoryList(int32 ContainerIndex) const
