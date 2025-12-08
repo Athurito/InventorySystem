@@ -2,6 +2,7 @@
 
 #include "InventoryManagerComponent.h"
 
+#include "Engine/ActorChannel.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
@@ -13,36 +14,30 @@ UInventoryManagerComponent::UInventoryManagerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+	InventoryList.OwnerComponent = this;
+}
+
+bool UInventoryManagerComponent::ReplicateSubobjects(class UActorChannel* Channel, class FOutBunch* Bunch,
+	FReplicationFlags* RepFlags)
+{
+	bool bWroteSomething = Super::ReplicateSubobjects(Channel, Bunch, RepFlags);
+
+	// Alle Item-Instanzen aus der InventoryList replizieren
+	for (FInventoryEntry& Entry : InventoryList.Entries)
+	{
+		if (Entry.Instance)
+		{
+			bWroteSomething |= Channel->ReplicateSubobject(Entry.Instance, *Bunch, *RepFlags);
+		}
+	}
+
+	return bWroteSomething;
 }
 
 void UInventoryManagerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UInventoryManagerComponent, Containers);
-}
-
-void UInventoryManagerComponent::InitializeContainers()
-{
-    Containers.Empty();
-
-    for (int32 DefIdx = 0; DefIdx < DefaultContainerDefinitions.Num(); ++DefIdx)
-    {
-        UInventoryContainerDefinition* Def = DefaultContainerDefinitions[DefIdx];
-        FInventoryContainerInstance& NewInstance = Containers.Emplace_GetRef();
-        NewInstance.Definition = Def;
-        NewInstance.InventoryList.OwnerComponent = this; // falls du das brauchst
-        // ContainerIndex für Events/Broadcasts setzen (nicht repliziert)
-        NewInstance.InventoryList.ContainerIndex = DefIdx;
-    }
-}
-
-
-void UInventoryManagerComponent::AddRepSubObject(UObject* SubObject)
-{
-	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && IsValid(SubObject))
-	{
-		AddReplicatedSubObject(SubObject);
-	}
+	DOREPLIFETIME(UInventoryManagerComponent, InventoryList);
 }
 
 void UInventoryManagerComponent::BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const
@@ -56,53 +51,32 @@ void UInventoryManagerComponent::BroadcastSlotChanged(int32 ContainerIndex, int3
 
 UInventoryItemInstance* UInventoryManagerComponent::GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const
 {
-	if (Containers.IsEmpty() || !Containers.IsValidIndex(ContainerIndex) || SlotIndex < 0)
-	{
-		return nullptr;
-	}
-	
-	return Containers[ContainerIndex].InventoryList.GetItemInstanceInSlot(SlotIndex);
+	return InventoryList.GetItemInstanceInSlot(ContainerIndex, SlotIndex);
 }
 
 UInventoryItemInstance* UInventoryManagerComponent::AddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 ContainerIndex, int32 StackCount)
 {
 	UInventoryItemInstance* Result = nullptr;
-	if (ItemDefinition != nullptr)
+	if (ItemDefinition)
 	{
-		check(Containers.IsValidIndex(ContainerIndex));
-		Result = Containers[ContainerIndex].InventoryList.AddEntry(ItemDefinition, SlotIndex, StackCount);
-		if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && Result)
-		{
-			AddReplicatedSubObject(Result);
-		}
+		Result = InventoryList.AddEntry(ItemDefinition, ContainerIndex, SlotIndex, StackCount);
 	}
 	return Result;
 }
 
 void UInventoryManagerComponent::AddItemInstance(UInventoryItemInstance* Instance, int32 SlotIndex, int32 ContainerIndex)
 {
-	Containers[ContainerIndex].InventoryList.AddEntry(Instance, SlotIndex);
-	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && Instance)
-	{
-		AddReplicatedSubObject(Instance);
-	}
+	InventoryList.AddEntry(Instance, ContainerIndex, SlotIndex);
 }
 
-void UInventoryManagerComponent::RemoveItemInstance(UInventoryItemInstance* Instance, int32 ContainerIndex)
+void UInventoryManagerComponent::RemoveItemInstance(UInventoryItemInstance* Instance)
 {
-	Containers[ContainerIndex].InventoryList.RemoveEntry(Instance);
-	if (Instance && IsUsingRegisteredSubObjectList())
-	{
-		RemoveReplicatedSubObject(Instance);
-	}
+	InventoryList.RemoveEntry(Instance);
 }
 
 TArray<UInventoryItemInstance*> UInventoryManagerComponent::GetAllItems(int32 ContainerIndex) const
 {
-    if (Containers.IsEmpty() || !Containers.IsValidIndex(ContainerIndex))
-        return TArray<UInventoryItemInstance*>();
-    
-    return Containers[ContainerIndex].InventoryList.GetAllItems();
+	return InventoryList.GetAllItemsInContainer(ContainerIndex);
 }
 
 void UInventoryManagerComponent::SetInventoryClickAction(EInventoryClickAction Action)
@@ -115,7 +89,7 @@ EInventoryClickAction UInventoryManagerComponent::GetInventoryClickAction() cons
 	return InventoryClickAction;
 }
 
-void UInventoryManagerComponent::HandleDrop(UInventoryManagerComponent* SourceManager, int32 SourceContainerIndex,
+void UInventoryManagerComponent::HandleDrop_Internal(UInventoryManagerComponent* SourceManager, int32 SourceContainerIndex,
                                             int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity,
                                             FGameplayTag OperationType)
 {
@@ -138,21 +112,18 @@ void UInventoryManagerComponent::HandleDrop(UInventoryManagerComponent* SourceMa
 	}
 }
 
+void UInventoryManagerComponent::HandleDropServer_Implementation(UInventoryManagerComponent* SourceManager,
+	int32 SourceContainerIndex, int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex,
+	int32 DragQuantity, FGameplayTag OperationType)
+{
+	HandleDrop_Internal(SourceManager, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, OperationType);
+}
+
 void UInventoryManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
+	InventoryList.OwnerComponent = this;
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
-	InitializeContainers();
-}
-
-void UInventoryManagerComponent::OnRep_Containers()
-{
-	for (int32 i = 0; i < Containers.Num(); ++i)
-	{
-		Containers[i].InventoryList.OwnerComponent = this;
-		Containers[i].InventoryList.ContainerIndex = i;
-	}
 }
 
 void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, int32 SourceSlotIndex,
@@ -163,10 +134,10 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 		return; // nichts tun
 	}
 
-	FInventoryList& List = GetInventoryList(ContainerIndex);
+	FInventoryList& List = InventoryList;
 
-	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* DestItem   = List.GetItemInstanceInSlot(DestSlotIndex);
+	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(ContainerIndex, SourceSlotIndex);
+	UInventoryItemInstance* DestItem   = List.GetItemInstanceInSlot(ContainerIndex, DestSlotIndex);
 
 	if (!SourceItem)
 	{
@@ -178,11 +149,11 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 	{
 		if (OperationType.MatchesTagExact(RpgTags::InventoryOperation_SplitOperation) && DragQuantity > 0 && DragQuantity < SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment))
 		{
-			SplitStack(List, SourceSlotIndex, DestSlotIndex, DragQuantity);
+			SplitStack(List,ContainerIndex, SourceSlotIndex, DestSlotIndex, DragQuantity);
 		}
 		else
 		{
-			MoveItem(List, SourceSlotIndex, DestSlotIndex);
+			MoveItem(List, ContainerIndex, SourceSlotIndex, DestSlotIndex);
 		}
 		return;
 	}
@@ -190,11 +161,11 @@ void UInventoryManagerComponent::HandleDropSameContainer(int32 ContainerIndex, i
 	// 2) Ziel belegt → Stack oder Swap
 	if (CanStack(SourceItem, DestItem))
 	{
-		MergeStacks(List, SourceSlotIndex, DestSlotIndex, DragQuantity);
+		MergeStacks(List, ContainerIndex, SourceSlotIndex, DestSlotIndex, DragQuantity);
 	}
 	else
 	{
-		SwapItems(List, SourceSlotIndex, DestSlotIndex);
+		SwapItems(List, ContainerIndex, SourceSlotIndex, DestSlotIndex);
 	}
 }
 
@@ -204,11 +175,11 @@ void UInventoryManagerComponent::HandleDropDifferentContainer(UInventoryManagerC
 {
 	if (!SourceManager) return;
 
-	FInventoryList& SourceList = SourceManager->GetInventoryList(SourceContainerIndex);
-	FInventoryList& DestList   = GetInventoryList(TargetContainerIndex);
+	FInventoryList& SourceList = SourceManager->GetInventoryList();
+	FInventoryList& DestList   = GetInventoryList();
 
-	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(TargetSlotIndex);
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceContainerIndex, SourceSlotIndex);
+	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(TargetContainerIndex, TargetSlotIndex);
 
 	if (!SourceItem)
 	{
@@ -251,7 +222,7 @@ void UInventoryManagerComponent::MoveItemAcrossContainers(UInventoryManagerCompo
 	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
 	int32 DestContainerIndex, int32 DestSlotIndex)
 {
-	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceContainerIndex, SourceSlotIndex);
 	if (!SourceItem)
 	{
 		return;
@@ -259,32 +230,20 @@ void UInventoryManagerComponent::MoveItemAcrossContainers(UInventoryManagerCompo
 
 	// SourceList: Eintrag entfernen
 	SourceList.RemoveEntry(SourceItem);
-
-	// Rep: Aus SourceManager austragen
-	if (SourceManager->IsUsingRegisteredSubObjectList())
-	{
-		SourceManager->RemoveReplicatedSubObject(SourceItem);
-	}
-
+	
 	// DestList: Instanz im Zielslot hinzufügen
-	DestList.AddEntry(SourceItem, DestSlotIndex);
-
-	// Rep: beim Zielmanager registrieren
-	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication())
-	{
-		AddReplicatedSubObject(SourceItem);
-	}
-
+	DestList.AddEntry(SourceItem, DestContainerIndex,  DestSlotIndex);
+	
 	// UI informieren
-	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+	SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
 }
 
 void UInventoryManagerComponent::SplitStackAcrossContainers(UInventoryManagerComponent* SourceManager,
 	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
 	int32 DestContainerIndex, int32 DestSlotIndex, int32 SplitQuantity)
 {
-	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceContainerIndex, SourceSlotIndex);
 	if (!SourceItem)
 	{
 		return;
@@ -297,32 +256,23 @@ void UInventoryManagerComponent::SplitStackAcrossContainers(UInventoryManagerCom
 	}
 
 	UInventoryItemDefinition* Def = SourceItem->GetItemDefinition();
-
-	// Neue Instanz im Zielcontainer, zunächst mit 0 Stack
-	UInventoryItemInstance* NewInstance = DestList.AddEntry(Def, DestSlotIndex, /*InitialStack*/ 0);
-
-	// Stackwerte ABSOLUT setzen
+	UInventoryItemInstance* NewInstance = DestList.AddEntry(Def, DestContainerIndex, DestSlotIndex, /*InitialStack*/ 0);
 	
 	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
 	NewInstance->SetStatTagStackCount(FragmentTags::StackableFragment, SplitQuantity);
-
-	// Rep: neue Instanz beim Zielmanager registrieren
-	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && NewInstance)
-	{
-		AddReplicatedSubObject(NewInstance);
-	}
+	
 
 	// UI informieren
-	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+	SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
 }
 
 void UInventoryManagerComponent::MergeStacksAcrossContainers(UInventoryManagerComponent* SourceManager,
 	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
 	int32 DestContainerIndex, int32 DestSlotIndex, int32 DragQuantity)
 {
-	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* TargetItem   = DestList.GetItemInstanceInSlot(DestSlotIndex);
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceContainerIndex, SourceSlotIndex);
+	UInventoryItemInstance* TargetItem   = DestList.GetItemInstanceInSlot(DestContainerIndex, DestSlotIndex);
 
 	if (!SourceItem || !TargetItem)
 	{
@@ -361,22 +311,18 @@ void UInventoryManagerComponent::MergeStacksAcrossContainers(UInventoryManagerCo
 	if (SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment) <= 0)
 	{
 		SourceList.RemoveEntry(SourceItem);
-		if (SourceManager->IsUsingRegisteredSubObjectList())
-		{
-			SourceManager->RemoveReplicatedSubObject(SourceItem);
-		}
 	}
 
-	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+	SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
 }
 
 void UInventoryManagerComponent::SwapItemsAcrossContainers(UInventoryManagerComponent* SourceManager,
 	FInventoryList& SourceList, int32 SourceContainerIndex, int32 SourceSlotIndex, FInventoryList& DestList,
 	int32 DestContainerIndex, int32 DestSlotIndex)
 {
-	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(DestSlotIndex);
+	UInventoryItemInstance* SourceItem = SourceList.GetItemInstanceInSlot(SourceContainerIndex, SourceSlotIndex);
+	UInventoryItemInstance* DestItem   = DestList.GetItemInstanceInSlot(DestContainerIndex, DestSlotIndex);
 
 	if (!SourceItem && !DestItem)
 	{
@@ -393,38 +339,20 @@ void UInventoryManagerComponent::SwapItemsAcrossContainers(UInventoryManagerComp
 		DestList.RemoveEntry(DestItem);
 	}
 
-	// Rep: Subobjects abmelden
-	if (SourceItem && SourceManager->IsUsingRegisteredSubObjectList())
-	{
-		SourceManager->RemoveReplicatedSubObject(SourceItem);
-	}
-	if (DestItem && IsUsingRegisteredSubObjectList())
-	{
-		RemoveReplicatedSubObject(DestItem);
-	}
-
 	// Einfügen in jeweils andere Liste
 	if (SourceItem)
 	{
-		DestList.AddEntry(SourceItem, DestSlotIndex);
-		if (IsUsingRegisteredSubObjectList() && IsReadyForReplication())
-		{
-			AddReplicatedSubObject(SourceItem);
-		}
+		DestList.AddEntry(SourceItem, DestContainerIndex, DestSlotIndex);
 	}
 
 	if (DestItem)
 	{
-		SourceList.AddEntry(DestItem, SourceSlotIndex);
-		if (SourceManager->IsUsingRegisteredSubObjectList() && SourceManager->IsReadyForReplication())
-		{
-			SourceManager->AddReplicatedSubObject(DestItem);
-		}
+		SourceList.AddEntry(DestItem, SourceContainerIndex, SourceSlotIndex);
 	}
 
 	// UI-Updates
-	// SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
+	SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(DestContainerIndex, DestSlotIndex);
 }
 
 bool UInventoryManagerComponent::CanStack(UInventoryItemInstance* A, UInventoryItemInstance* B) const
@@ -456,30 +384,27 @@ bool UInventoryManagerComponent::CanStack(UInventoryItemInstance* A, UInventoryI
 	return (CountA < MaxStack || CountB < MaxStack);
 }
 
-void UInventoryManagerComponent::MoveItem(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex)
+void UInventoryManagerComponent::MoveItem(FInventoryList& List, int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex)
 {
 	if (SourceSlotIndex == TargetSlotIndex)
 	{
 		return;
 	}
 
-	UInventoryItemInstance* Instance = List.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* Instance = List.GetItemInstanceInSlot(ContainerIndex, SourceSlotIndex);
 	if (!Instance)
 	{
 		return;
 	}
 
-	// Einfach SlotIndex auf dem Entry ändern – du brauchst hier Zugriff auf Entry
-	// Am saubersten: Hilfsfunktion in FInventoryList schreiben:
-
-	List.MoveEntry(SourceSlotIndex, TargetSlotIndex);
+	List.MoveEntry(ContainerIndex, SourceSlotIndex, TargetSlotIndex);
 
 	// UI informieren:
-	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, TargetSlotIndex);
 }
 
-void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 SlotA, int32 SlotB)
+void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 ContainerIndex, int32 SlotA, int32 SlotB)
 {
 	if (SlotA == SlotB)
 	{
@@ -491,6 +416,11 @@ void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 SlotA, in
 
 	for (FInventoryEntry& Entry : List.Entries)
 	{
+		if (Entry.ContainerIndex != ContainerIndex)
+		{
+			continue;
+		}
+
 		if (Entry.SlotIndex == SlotA) EntryA = &Entry;
 		else if (Entry.SlotIndex == SlotB) EntryB = &Entry;
 	}
@@ -502,15 +432,15 @@ void UInventoryManagerComponent::SwapItems(FInventoryList& List, int32 SlotA, in
 	if (EntryA) { EntryA->SlotIndex = SlotB; List.MarkItemDirty(*EntryA); }
 	if (EntryB) { EntryB->SlotIndex = SlotA; List.MarkItemDirty(*EntryB); }
 
-	// BroadcastSlotChanged(List.ContainerIndex, SlotA);
-	// BroadcastSlotChanged(List.ContainerIndex, SlotB);
+	BroadcastSlotChanged(ContainerIndex, SlotA);
+	BroadcastSlotChanged(ContainerIndex, SlotB);
 }
 
-void UInventoryManagerComponent::MergeStacks(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,
+void UInventoryManagerComponent::MergeStacks(FInventoryList& List,int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex,
 	int32 DragQuantity)
 {
-	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(SourceSlotIndex);
-	UInventoryItemInstance* DestItem   = List.GetItemInstanceInSlot(TargetSlotIndex);
+	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(ContainerIndex, SourceSlotIndex);
+	UInventoryItemInstance* DestItem   = List.GetItemInstanceInSlot(ContainerIndex, TargetSlotIndex);
 	if (!SourceItem || !DestItem) return;
 
 	const UInventoryFragment_Stackable* StackFrag = SourceItem->FindFragmentByClass<UInventoryFragment_Stackable>();
@@ -542,14 +472,14 @@ void UInventoryManagerComponent::MergeStacks(FInventoryList& List, int32 SourceS
 		List.RemoveEntry(SourceItem);
 	}
 
-	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, TargetSlotIndex);
 }
 
-void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,
+void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex,
 	int32 SplitQuantity)
 {
-	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(SourceSlotIndex);
+	UInventoryItemInstance* SourceItem = List.GetItemInstanceInSlot(ContainerIndex, SourceSlotIndex);
 	if (!SourceItem) return;
 
 	const int32 SourceCount = SourceItem->GetStatTagStackCount( FragmentTags::StackableFragment);
@@ -557,20 +487,12 @@ void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 SourceSl
 
 	// Neue Instance mit gleicher Def
 	UInventoryItemDefinition* Def = SourceItem->GetItemDefinition();
-	UInventoryItemInstance* NewInstance = List.AddEntry(Def, TargetSlotIndex, SplitQuantity);
-	//SourceItem->AddStatTagStack(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
-	
+	UInventoryItemInstance* NewInstance = List.AddEntry(Def, ContainerIndex, TargetSlotIndex, SplitQuantity);
 	
 	SourceItem->SetStatTagStackCount( FragmentTags::StackableFragment, SourceCount - SplitQuantity);
-	//SetStackCount(SourceItem, SourceCount - SplitQuantity);
 
-	if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && NewInstance)
-	{
-		AddReplicatedSubObject(NewInstance);
-	}
-
-	// BroadcastSlotChanged(List.ContainerIndex, SourceSlotIndex);
-	// BroadcastSlotChanged(List.ContainerIndex, TargetSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, SourceSlotIndex);
+	BroadcastSlotChanged(ContainerIndex, TargetSlotIndex);
 }
 
 bool UInventoryManagerComponent::CanPlaceInContainer(UInventoryItemInstance* SourceItem, int32 TargetContainerIndex,
@@ -579,17 +501,5 @@ bool UInventoryManagerComponent::CanPlaceInContainer(UInventoryItemInstance* Sou
 	if (!SourceItem) return false;
 	
 	return true;
-}
-
-const FInventoryList& UInventoryManagerComponent::GetInventoryList(int32 ContainerIndex) const
-{
-	check(Containers.IsValidIndex(ContainerIndex));
-	return Containers[ContainerIndex].InventoryList;
-}
-
-FInventoryList& UInventoryManagerComponent::GetInventoryList(int32 ContainerIndex)
-{
-	check(Containers.IsValidIndex(ContainerIndex));
-	return Containers[ContainerIndex].InventoryList;
 }
 

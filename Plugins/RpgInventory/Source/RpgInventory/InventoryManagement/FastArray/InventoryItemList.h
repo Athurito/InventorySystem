@@ -54,6 +54,9 @@ private:
 	
 	UPROPERTY(NotReplicated)
 	int32 LastObservedCount = INDEX_NONE;
+	
+	UPROPERTY()
+	int32 ContainerIndex = INDEX_NONE;   
 
 	UPROPERTY()
 	int32 SlotIndex = INDEX_NONE;
@@ -65,19 +68,11 @@ struct FInventoryList : public FFastArraySerializer
 {
 	GENERATED_BODY()
 
-	FInventoryList()
-		: OwnerComponent(nullptr)
-	{
-	}
+	FInventoryList() : OwnerComponent(nullptr){}
 
-	FInventoryList(UActorComponent* InOwnerComponent)
-		: OwnerComponent(InOwnerComponent)
-	{
-	}
-
-	TArray<UInventoryItemInstance*> GetAllItems() const;
-
-public:
+	FInventoryList(UActorComponent* InOwnerComponent) : OwnerComponent(InOwnerComponent){}
+	
+	
 	//~FFastArraySerializer contract
 	void PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize);
 	void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize);
@@ -89,34 +84,30 @@ public:
 		return FastArrayDeltaSerialize<FInventoryEntry, FInventoryList>(Entries, DeltaParms, *this);
 	}
 
-	UInventoryItemInstance* AddEntry(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex,  int32 StackCount);
-	void AddEntry(UInventoryItemInstance* Instance, int32 SlotIndex);
+	
+	TArray<UInventoryItemInstance*> GetAllItemsInContainer(int32 ContainerIndex) const;
 
+	UInventoryItemInstance* AddEntry(UInventoryItemDefinition* ItemDefinition, int32 ContainerIndex, int32 SlotIndex, int32 StackCount);
+	void AddEntry(UInventoryItemInstance* Instance, int32 ContainerIndex, int32 SlotIndex);
 	void RemoveEntry(UInventoryItemInstance* Instance);
 
-	UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex) const;
+	UInventoryItemInstance* GetItemInstanceInSlot(int32 ContainerIndex, int32 SlotIndex) const;
 
-	void MoveEntry(int32 SourceSlotIndex, int32 DestSlotIndex);
+	void MoveEntry(int32 ContainerIndex, int32 SourceSlotIndex, int32 DestSlotIndex);
 
 
 private:
     friend UInventoryManagerComponent;
-
-private:
-    // Replicated list of items
+	
     UPROPERTY()
     TArray<FInventoryEntry> Entries;
 
     UPROPERTY(NotReplicated)
     TObjectPtr<UActorComponent> OwnerComponent;
-
-    // Der Container-Index, zu dem diese Liste gehört (nur lokal für Events/Broadcasts)
-    UPROPERTY(NotReplicated)
-    int32 ContainerIndex = INDEX_NONE;
 };
 
 template<>
-struct TStructOpsTypeTraits<FInventoryList> : public TStructOpsTypeTraitsBase2<FInventoryList>
+struct TStructOpsTypeTraits<FInventoryList> : TStructOpsTypeTraitsBase2<FInventoryList>
 {
 	enum { WithNetDeltaSerializer = true };
 };

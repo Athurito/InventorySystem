@@ -43,37 +43,7 @@ struct FInventoryDragPayload
 	FGameplayTag OperationType = FGameplayTag::EmptyTag;
 };
 
-USTRUCT()
-struct FInventoryContainerInstance
-{
-	GENERATED_BODY()
-	
-	UPROPERTY()
-	TObjectPtr<const UInventoryContainerDefinition> Definition = nullptr;
-	
-	UPROPERTY()
-	FInventoryList InventoryList;
-	
-	int32 GetNumSlots() const
-	{
-		return Definition ? Definition->TotalSlots : 0;
-	}
 
-	bool IsValidSlot(int32 SlotIndex) const
-	{
-		return SlotIndex >= 0 && SlotIndex < GetNumSlots();
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FInvContainerEntry
-{
-	GENERATED_BODY()
-	UPROPERTY(BlueprintReadOnly) EInventorySlotType Type = EInventorySlotType::Generic;
-	UPROPERTY(BlueprintReadOnly) int32 Index = INDEX_NONE; // Index im Containers-Array
-};
-
-// Informiert UI/ViewModels darüber, dass sich ein Slot in einem bestimmten Container geändert hat
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventorySlotChanged, int32, ContainerIndex, int32, SlotIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
@@ -83,21 +53,23 @@ class RPGINVENTORY_API UInventoryManagerComponent : public UActorComponent
 
 public:
     UInventoryManagerComponent();
-    
-    void InitializeContainers();
-    void AddRepSubObject(UObject* SubObject);
+	virtual bool ReplicateSubobjects(UActorChannel* Channel, FOutBunch* Bunch, FReplicationFlags* RepFlags) override;
+	
 	
     void BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const;
 
     UInventoryItemInstance* GetItemInstanceInSlot(int32 SlotIndex, int32 ContainerIndex) const;
 	
-    int32 GetNumContainers() const { return Containers.Num(); }
-    int32 GetNumSlots(int32 ContainerIndex) const
-    {
-        return (Containers.IsValidIndex(ContainerIndex) && Containers[ContainerIndex].Definition)
-            ? Containers[ContainerIndex].GetNumSlots()
-            : 0;
-    }
+	int32 GetNumContainers() const { return DefaultContainerDefinitions.Num(); }
+
+	int32 GetNumSlots(int32 ContainerIndex) const
+	{
+		if (!DefaultContainerDefinitions.IsValidIndex(ContainerIndex) || !DefaultContainerDefinitions[ContainerIndex])
+		{
+			return 0;
+		}
+		return DefaultContainerDefinitions[ContainerIndex]->TotalSlots;
+	}
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
@@ -109,7 +81,7 @@ public:
 	void AddItemInstance(UInventoryItemInstance* Instance, int32 SlotIndex, int32 ContainerIndex);
 	
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
-	void RemoveItemInstance(UInventoryItemInstance* Instance, int32 ContainerIndex);
+	void RemoveItemInstance(UInventoryItemInstance* Instance);
 	
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	TArray<UInventoryItemInstance*> GetAllItems(int32 ContainerIndex) const;
@@ -119,10 +91,8 @@ public:
 	UFUNCTION(BlueprintCallable,Category="Inventory")
 	EInventoryClickAction GetInventoryClickAction() const;
 	
-	
-	//Drag drop..
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory|DragDrop")
-	void HandleDrop(
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Inventory|DragDrop")
+	void HandleDropServer(
 		UInventoryManagerComponent* SourceManager,
 		int32 SourceContainerIndex,
 		int32 SourceSlotIndex,
@@ -132,12 +102,13 @@ public:
 		FGameplayTag OperationType
 	);
 	
-	
-
-	
+	FInventoryList&       GetInventoryList()       { return InventoryList; }
+	const FInventoryList& GetInventoryList() const { return InventoryList; }
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 
 private:
 
@@ -145,12 +116,20 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TArray<TObjectPtr<UInventoryContainerDefinition>> DefaultContainerDefinitions;
-
-	UPROPERTY(ReplicatedUsing=OnRep_Containers)
-	TArray<FInventoryContainerInstance> Containers;
+	UPROPERTY(Replicated)
+	FInventoryList InventoryList;
 	
-	UFUNCTION()
-	void OnRep_Containers();
+	
+	//Drag drop..
+	void HandleDrop_Internal(
+		UInventoryManagerComponent* SourceManager,
+		int32 SourceContainerIndex,
+		int32 SourceSlotIndex,
+		int32 TargetContainerIndex,
+		int32 TargetSlotIndex,
+		int32 DragQuantity,
+		FGameplayTag OperationType
+	);
 	
 	void HandleDropSameContainer(
 	int32 ContainerIndex,
@@ -209,15 +188,10 @@ private:
 	
 	
 	bool CanStack(UInventoryItemInstance* A, UInventoryItemInstance* B) const;
-	void MoveItem(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex);
-	void SwapItems(FInventoryList& List, int32 SlotA, int32 SlotB);
-	void MergeStacks(FInventoryList& List, int32 SourceSlotIndex, int32 TargetSlotIndex,  int32 DragQuantity);
-	void SplitStack(FInventoryList& List,int32 SourceSlotIndex,int32 TargetSlotIndex,int32 SplitQuantity);
+	void MoveItem(FInventoryList& List, int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex);
+	void SwapItems(FInventoryList& List, int32 ContainerIndex, int32 SlotA, int32 SlotB);
+	void MergeStacks(FInventoryList& List, int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 DragQuantity);
+	void SplitStack(FInventoryList& List, int32 ContainerIndex, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 SplitQuantity);
 	
 	bool CanPlaceInContainer(UInventoryItemInstance* SourceItem, int32 TargetContainerIndex, int32 TargetSlotIndex) const;
-	
-	
-	const FInventoryList& GetInventoryList(int32 ContainerIndex) const;
-	FInventoryList& GetInventoryList(int32 ContainerIndex);
-	
 };

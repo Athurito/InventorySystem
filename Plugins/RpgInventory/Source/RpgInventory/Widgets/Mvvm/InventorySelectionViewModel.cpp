@@ -62,9 +62,7 @@ void UInventorySelectionViewModel::OnManagerSlotChanged(int32 ChangedContainer, 
 {
     if (!Manager.IsValid()) return;
     if (ChangedContainer != ContainerIndex) return;
-    
-    
-    // Wenn die Liste gerade erst angekommen ist und wir noch keine Slots haben:
+
     const int32 NumSlotsNow = Manager->GetNumSlots(ContainerIndex);
     if (Slots.Num() != NumSlotsNow)
     {
@@ -72,20 +70,20 @@ void UInventorySelectionViewModel::OnManagerSlotChanged(int32 ChangedContainer, 
         return;
     }
 
-    if (!Slots.IsValidIndex(SlotIndex)) return;
-    
-    UInventoryItemViewModel* VM = Slots[SlotIndex];
-    if (!VM) return;
-
-    if (UInventoryItemInstance* Instance = Manager->GetItemInstanceInSlot(SlotIndex, ContainerIndex))
+    // *** Hard-Resync aller Slots – simpel und robust ***
+    for (int32 i = 0; i < Slots.Num(); ++i)
     {
-        VM->SetFromItemInstance(Instance, Manager.Get(), ContainerIndex, SlotIndex);
-    }
-    else
-    {
-        VM->ClearSlot();
+        if (!Slots[i]) continue;
+
+        if (UInventoryItemInstance* Instance = Manager->GetItemInstanceInSlot(i, ContainerIndex))
+        {
+            Slots[i]->SetFromItemInstance(Instance, Manager.Get(), ContainerIndex, i);
+        }
+        else
+        {
+            Slots[i]->ClearSlot();
+        }
     }
 
-    // Falls UI an das Array als Ganzes bindet
     UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(Slots);
 }
