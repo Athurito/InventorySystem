@@ -62,14 +62,7 @@ public:
 	
 	int32 GetNumContainers() const { return DefaultContainerDefinitions.Num(); }
 
-	int32 GetNumSlots(int32 ContainerIndex) const
-	{
-		if (!DefaultContainerDefinitions.IsValidIndex(ContainerIndex) || !DefaultContainerDefinitions[ContainerIndex])
-		{
-			return 0;
-		}
-		return DefaultContainerDefinitions[ContainerIndex]->TotalSlots;
-	}
+	int32 GetNumSlots(int32 ContainerIndex) const;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
@@ -91,16 +84,16 @@ public:
 	UFUNCTION(BlueprintCallable,Category="Inventory")
 	EInventoryClickAction GetInventoryClickAction() const;
 	
-	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Inventory|DragDrop")
-	void HandleDropServer(
-		UInventoryManagerComponent* SourceManager,
-		int32 SourceContainerIndex,
-		int32 SourceSlotIndex,
-		int32 TargetContainerIndex,
-		int32 TargetSlotIndex,
-		int32 DragQuantity,
-		FGameplayTag OperationType
-	);
+	// UFUNCTION(Server, Reliable, BlueprintCallable, Category="Inventory|DragDrop")
+	// void HandleDropServer(
+	// 	UInventoryManagerComponent* SourceManager,
+	// 	int32 SourceContainerIndex,
+	// 	int32 SourceSlotIndex,
+	// 	int32 TargetContainerIndex,
+	// 	int32 TargetSlotIndex,
+	// 	int32 DragQuantity,
+	// 	FGameplayTag OperationType
+	// );
 	
 	FInventoryList&       GetInventoryList()       { return InventoryList; }
 	const FInventoryList& GetInventoryList() const { return InventoryList; }
@@ -112,6 +105,7 @@ protected:
 
 private:
 
+	friend class UInventoryNetComponent;
 	EInventoryClickAction InventoryClickAction = EInventoryClickAction::None;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")

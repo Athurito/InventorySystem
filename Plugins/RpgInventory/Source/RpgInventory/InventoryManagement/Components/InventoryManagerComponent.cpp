@@ -54,6 +54,15 @@ UInventoryItemInstance* UInventoryManagerComponent::GetItemInstanceInSlot(int32 
 	return InventoryList.GetItemInstanceInSlot(ContainerIndex, SlotIndex);
 }
 
+int32 UInventoryManagerComponent::GetNumSlots(int32 ContainerIndex) const
+{
+	if (!DefaultContainerDefinitions.IsValidIndex(ContainerIndex) || !DefaultContainerDefinitions[ContainerIndex])
+	{
+		return 0;
+	}
+	return DefaultContainerDefinitions[ContainerIndex]->TotalSlots;
+}
+
 UInventoryItemInstance* UInventoryManagerComponent::AddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 ContainerIndex, int32 StackCount)
 {
 	UInventoryItemInstance* Result = nullptr;
@@ -110,13 +119,6 @@ void UInventoryManagerComponent::HandleDrop_Internal(UInventoryManagerComponent*
 	{
 		HandleDropDifferentContainer(SourceManager, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, OperationType);
 	}
-}
-
-void UInventoryManagerComponent::HandleDropServer_Implementation(UInventoryManagerComponent* SourceManager,
-	int32 SourceContainerIndex, int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex,
-	int32 DragQuantity, FGameplayTag OperationType)
-{
-	HandleDrop_Internal(SourceManager, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, OperationType);
 }
 
 void UInventoryManagerComponent::BeginPlay()
