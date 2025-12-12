@@ -263,6 +263,16 @@ void UInventoryManagerComponent::SplitStackAcrossContainers(UInventoryManagerCom
 	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - SplitQuantity);
 	NewInstance->SetStatTagStackCount(FragmentTags::StackableFragment, SplitQuantity);
 	
+	// Mark fast array entries dirty so clients receive PostReplicatedChange and refresh UI
+	for (FInventoryEntry& Entry : SourceList.Entries)
+	{
+		if (Entry.ContainerIndex == SourceContainerIndex && Entry.SlotIndex == SourceSlotIndex)
+		{
+			SourceList.MarkItemDirty(Entry);
+			break;
+		}
+	}
+	// DestList.AddEntry already marked the new entry dirty
 
 	// UI informieren
 	SourceManager->BroadcastSlotChanged(SourceContainerIndex, SourceSlotIndex);
@@ -308,6 +318,24 @@ void UInventoryManagerComponent::MergeStacksAcrossContainers(UInventoryManagerCo
 	const int32 ActuallyMoved = FMath::Min(AmountToMove, FreeSpace);
 	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - ActuallyMoved);
 	TargetItem->SetStatTagStackCount(FragmentTags::StackableFragment, TargetCount + ActuallyMoved);
+
+	// Mark both entries dirty so clients trigger PostReplicatedChange
+	for (FInventoryEntry& Entry : SourceList.Entries)
+	{
+		if (Entry.ContainerIndex == SourceContainerIndex && Entry.SlotIndex == SourceSlotIndex)
+		{
+			SourceList.MarkItemDirty(Entry);
+			break;
+		}
+	}
+	for (FInventoryEntry& Entry : DestList.Entries)
+	{
+		if (Entry.ContainerIndex == DestContainerIndex && Entry.SlotIndex == DestSlotIndex)
+		{
+			DestList.MarkItemDirty(Entry);
+			break;
+		}
+	}
 
 	// Wenn Source leer, Eintrag & Rep entfernen
 	if (SourceItem->GetStatTagStackCount(FragmentTags::StackableFragment) <= 0)
@@ -467,6 +495,16 @@ void UInventoryManagerComponent::MergeStacks(FInventoryList& List,int32 Containe
 	SourceItem->SetStatTagStackCount(FragmentTags::StackableFragment, SourceCount - ActuallyMoved);
 	DestItem->SetStatTagStackCount(FragmentTags::StackableFragment, DestCount + ActuallyMoved);
 
+	// Mark entries dirty for client-side PostReplicatedChange
+	for (FInventoryEntry& Entry : List.Entries)
+	{
+		if (Entry.ContainerIndex != ContainerIndex) continue;
+		if (Entry.SlotIndex == SourceSlotIndex || Entry.SlotIndex == TargetSlotIndex)
+		{
+			List.MarkItemDirty(Entry);
+		}
+	}
+
 	// Wenn Source leer geworden ist, Eintrag löschen
 	
 	if (SourceItem->GetStatTagStackCount( FragmentTags::StackableFragment) <= 0)
@@ -492,6 +530,16 @@ void UInventoryManagerComponent::SplitStack(FInventoryList& List, int32 Containe
 	UInventoryItemInstance* NewInstance = List.AddEntry(Def, ContainerIndex, TargetSlotIndex, SplitQuantity);
 	
 	SourceItem->SetStatTagStackCount( FragmentTags::StackableFragment, SourceCount - SplitQuantity);
+
+	// Mark source entry dirty so clients refresh the slot
+	for (FInventoryEntry& Entry : List.Entries)
+	{
+		if (Entry.ContainerIndex == ContainerIndex && Entry.SlotIndex == SourceSlotIndex)
+		{
+			List.MarkItemDirty(Entry);
+			break;
+		}
+	}
 
 	BroadcastSlotChanged(ContainerIndex, SourceSlotIndex);
 	BroadcastSlotChanged(ContainerIndex, TargetSlotIndex);
