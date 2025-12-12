@@ -28,6 +28,11 @@ public class RpgInventory : ModuleRules
 				"Core",
 				"UMG",
 				"CommonUI",
+				"GameplayTags",
+				"GameplayAbilities",
+				"GameplayTasks",
+				"NetCore",
+				"StructUtils"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -40,7 +45,7 @@ public class RpgInventory : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"EnhancedInput",
+				"EnhancedInput", "ModelViewViewModel",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

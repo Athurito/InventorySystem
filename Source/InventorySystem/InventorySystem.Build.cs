@@ -18,10 +18,13 @@ public class InventorySystem : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"GameplayAbilities",
+			"GameplayTags",
+			"GameplayTasks"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RpgInventory" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"InventorySystem",
