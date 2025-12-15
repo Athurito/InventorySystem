@@ -1,22 +1,37 @@
-Binaries
-DerivedDataCache
-Intermediate
-Saved
-.vscode
-.vs
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Plugin generated
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+Plugins/*/Saved/
+
+# IDEs
+.vscode/
+.vs/
+.idea/
+*.iml
+
+# Visual Studio / Rider
 *.VC.db
+*.VC.opendb
 *.opensdf
 *.opendb
 *.sdf
 *.sln
 *.suo
+
+# Xcode
 *.xcodeproj
 *.xcworkspace
 
-# Rider user-specific files – don’t share
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/**/workspace.xml
-.idea/**/projectSettingsUpdater.xml
-.idea/
-*.iml
+# Logs & crash reports
+*.log
+CrashReportClient/
+
+# OS junk
+.DS_Store
+Thumbs.db
