@@ -11,10 +11,14 @@
  * 
  */
 
+// Forward declarations to avoid heavy includes
+class AActor;
+class UTexture2D;
+
 USTRUCT(BlueprintType)
-struct FInteractionEventPayload
+struct SIMPLEINTERACTIONSYSTEM_API FInteractionEventPayload
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Interactor = nullptr;   // Pawn/Character
 	UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Interactable = nullptr; // Target Actor
@@ -23,7 +27,7 @@ struct FInteractionEventPayload
 };
 
 UCLASS()
-class SIMPLEINTERACTIONSYSTEM_API UInteractionDefinition : public UPrimaryDataAsset
+class SIMPLEINTERACTIONSYSTEM_API UInteractionDefinition : public UDataAsset
 {
 	GENERATED_BODY()
 	

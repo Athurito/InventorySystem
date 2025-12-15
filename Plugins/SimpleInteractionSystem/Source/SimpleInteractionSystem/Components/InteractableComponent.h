@@ -9,6 +9,7 @@
 
 class UArrowComponent;
 class UWidgetComponent;
+class UUserWidget;
 struct FGameplayTag;
 class UInteractionDefinition;
 

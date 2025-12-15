@@ -22,25 +22,29 @@ public class SimpleInteractionSystem : ModuleRules
 			);
 			
 		
-		PublicDependencyModuleNames.AddRange(
-			new string[]
-			{
-				"Core",
-				// ... add other public dependencies that you statically link with here ...
-			}
-			);
+  PublicDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "Core",
+                "CoreUObject",
+                "Engine",
+                "GameplayTags",
+                "UMG",
+                // Public because types appear in public headers (FGameplayTag, UUserWidget)
+            }
+            );
 			
 		
-		PrivateDependencyModuleNames.AddRange(
-			new string[]
-			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore", "CommonUI", "GameplayAbilities",
-				// ... add private dependencies that you statically link with here ...	
-			}
-			);
+  PrivateDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "Slate",
+                "SlateCore",
+                "CommonUI",
+                "GameplayAbilities",
+                // ... add private dependencies that you statically link with here ... 
+            }
+            );
 		
 		
 		DynamicallyLoadedModuleNames.AddRange(
