@@ -68,6 +68,9 @@ public:
 	FOnInventorySlotChanged OnInventorySlotChanged;
 	
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	int32 TryAddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 Count);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	UInventoryItemInstance* AddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 ContainerIndex, int32 StackCount);
 	
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
@@ -83,17 +86,6 @@ public:
 	void SetInventoryClickAction(EInventoryClickAction Action);
 	UFUNCTION(BlueprintCallable,Category="Inventory")
 	EInventoryClickAction GetInventoryClickAction() const;
-	
-	// UFUNCTION(Server, Reliable, BlueprintCallable, Category="Inventory|DragDrop")
-	// void HandleDropServer(
-	// 	UInventoryManagerComponent* SourceManager,
-	// 	int32 SourceContainerIndex,
-	// 	int32 SourceSlotIndex,
-	// 	int32 TargetContainerIndex,
-	// 	int32 TargetSlotIndex,
-	// 	int32 DragQuantity,
-	// 	FGameplayTag OperationType
-	// );
 	
 	FInventoryList&       GetInventoryList()       { return InventoryList; }
 	const FInventoryList& GetInventoryList() const { return InventoryList; }

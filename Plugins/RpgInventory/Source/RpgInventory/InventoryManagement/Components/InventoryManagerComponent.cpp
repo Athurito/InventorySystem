@@ -9,6 +9,8 @@
 #include "RpgInventory/InventoryManagement/GameplayTags/InventoryOperationTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
+#include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 
 UInventoryManagerComponent::UInventoryManagerComponent()
 {
@@ -61,6 +63,66 @@ int32 UInventoryManagerComponent::GetNumSlots(int32 ContainerIndex) const
 		return 0;
 	}
 	return DefaultContainerDefinitions[ContainerIndex]->TotalSlots;
+}
+
+int32 UInventoryManagerComponent::TryAddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 Count)
+{
+	if (!ItemDefinition || Count <= 0) return 0;
+
+	int32 RemainingCount = Count;
+
+	// 1) Versuche, existierende Stacks aufzufüllen
+	const int32 NumContainers = DefaultContainerDefinitions.Num();
+	for (int32 ContainerIdx = 0; ContainerIdx < NumContainers; ++ContainerIdx)
+	{
+		for (int32 SlotIdx = 0; SlotIdx < GetNumSlots(ContainerIdx); ++SlotIdx)
+		{
+			UInventoryItemInstance* Existing = GetItemInstanceInSlot(SlotIdx, ContainerIdx);
+			if (Existing && Existing->GetItemDefinition() == ItemDefinition)
+			{
+				const UInventoryFragment_Stackable* StackFrag = Existing->FindFragmentByClass<UInventoryFragment_Stackable>();
+				if (StackFrag)
+				{
+					const int32 MaxStack = StackFrag->GetMaxStackSize();
+					int32 CurrentCount = Existing->GetStatTagStackCount(FragmentTags::StackableFragment);
+					if (CurrentCount < MaxStack)
+					{
+						int32 CanAdd = FMath::Min(RemainingCount, MaxStack - CurrentCount);
+						Existing->SetStatTagStackCount(FragmentTags::StackableFragment, CurrentCount + CanAdd);
+						RemainingCount -= CanAdd;
+						BroadcastSlotChanged(ContainerIdx, SlotIdx);
+
+						if (RemainingCount <= 0) return Count;
+					}
+				}
+			}
+		}
+	}
+
+	// 2) Neue Slots belegen für den Rest
+	int32 MaxStackSize = 1;
+	if (const UInventoryFragment_Stackable* StackFrag = Cast<UInventoryFragment_Stackable>(ItemDefinition->FindFragmentByClass(UInventoryFragment_Stackable::StaticClass())))
+	{
+		MaxStackSize = StackFrag->GetMaxStackSize();
+	}
+
+	for (int32 ContainerIdx = 0; ContainerIdx < NumContainers; ++ContainerIdx)
+	{
+		const int32 SlotsCount = GetNumSlots(ContainerIdx);
+		for (int32 SlotIdx = 0; SlotIdx < SlotsCount; ++SlotIdx)
+		{
+			if (GetItemInstanceInSlot(SlotIdx, ContainerIdx) == nullptr)
+			{
+				int32 ToAdd = FMath::Min(RemainingCount, MaxStackSize);
+				AddItemDefinition(ItemDefinition, SlotIdx, ContainerIdx, ToAdd);
+				RemainingCount -= ToAdd;
+
+				if (RemainingCount <= 0) return Count;
+			}
+		}
+	}
+
+	return Count - RemainingCount;
 }
 
 UInventoryItemInstance* UInventoryManagerComponent::AddItemDefinition(UInventoryItemDefinition* ItemDefinition, int32 SlotIndex, int32 ContainerIndex, int32 StackCount)

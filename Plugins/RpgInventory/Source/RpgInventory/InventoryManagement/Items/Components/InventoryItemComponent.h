@@ -48,8 +48,14 @@ protected:
 
 private:
 	
+	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (ClampMin = "1"))
+	int32 InitialStackCount = 1;
+
 	UPROPERTY(ReplicatedUsing=OnRep_ItemId)
 	FPrimaryAssetId ItemId;
+
+	UPROPERTY(Replicated)
+	int32 CurrentStackCount = 1;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Inventory")
 	TSoftObjectPtr<UInventoryItemDefinition> ItemDefinition;

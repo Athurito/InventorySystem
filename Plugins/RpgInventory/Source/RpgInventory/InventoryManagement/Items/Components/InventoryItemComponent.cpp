@@ -4,21 +4,18 @@
 #include "InventoryItemComponent.h"
 
 #include "Net/UnrealNetwork.h"
-#include "AbilitySystemInterface.h"
-#include "AbilitySystemComponent.h"
 #include "Engine/AssetManager.h"
-#include "GameFramework/PlayerState.h"
 #include "GameFramework/Controller.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Pickup.h"
-#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_SetStats.h"
 #include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
 
 void UInventoryItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ThisClass, ItemId);
+	DOREPLIFETIME(ThisClass, CurrentStackCount);
 }
 
 int32 UInventoryItemComponent::GetMaxStackSize() const
@@ -41,7 +38,11 @@ void UInventoryItemComponent::InitItemByDefinition(UInventoryItemDefinition* Def
 	ItemDefinition = Definition;
 	ItemId   = Definition ? Definition->GetPrimaryAssetId() : FPrimaryAssetId();
 
-	// InitRuntimeFromDefinition(Definition);
+	// Initialmenge wird nun direkt über InitialStackCount gesteuert
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		CurrentStackCount = InitialStackCount;
+	}
 }
 
 void UInventoryItemComponent::InitItemById(FPrimaryAssetId Id)
@@ -110,91 +111,38 @@ bool UInventoryItemComponent::CanInteract_Implementation(APawn* Instigator) cons
 
 void UInventoryItemComponent::Interact_Implementation(APawn* Instigator)
 {
-	UInventoryManagerComponent* InventoryComponent = nullptr;
-	
-	InventoryComponent = UInventoryStatics::ResolveInventoryFromInstigator(Instigator);
-	
+	UInventoryManagerComponent* InventoryComponent = UInventoryStatics::ResolveInventoryFromInstigator(Instigator);
 	if (!InventoryComponent)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Interact: NO InventoryComponent found anywhere!"));
+		UE_LOG(LogTemp, Error, TEXT("Interact: NO InventoryComponent found!"));
 		return;
 	}
 	
 	const UInventoryItemDefinition* Def = GetItemDefinition();
-	if (!Def)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Interact: No ItemDefinition, aborting"));
-		return;
-	}
+	if (!Def) return;
 
-	// // 1) If item is consumable, respect policy
-	// if (const FConsumableFragment* Cons = Def->GetFragmentOfTypeWithTag<FConsumableFragment>(FragmentTags::ConsumableFragment))
-	// {
-	// 	switch (Cons->UseAvailability)
-	// 	{
-	// 		case EUseAvailability::WorldOnly:
-	// 		case EUseAvailability::WorldOrInventory:
-	// 		{
-	// 			// InventoryComponent->TryUseWorldItem(this, FMath::Max(1, Cons->QuantityPerUse));
-	// 			return;
-	// 		}
-	// 		case EUseAvailability::InventoryOnly:
-	// 		{
-	// 			// Not usable directly in world; fall through to pickup
-	// 			break;
-	// 		}
-	// 		case EUseAvailability::PickupThenUseIfWorld:
-	// 		{
-	// 			// We will pick up below; after successful pickup we may auto use
-	// 			break;
-	// 		}
-	// 	}
-	// }
+	// Manager bitten, die Menge aufzunehmen (verteilt auf Stacks/Slots)
+	int32 AddedCount = InventoryComponent->TryAddItemDefinition(const_cast<UInventoryItemDefinition*>(Def), CurrentStackCount);
 
-	// 2) Otherwise: attempt to pick up into an appropriate container
-	const FGameplayTag ItemType = Def->GetItemType();
-	int32 TargetContainerIdx = 0; // Default to first container for now
-	
-	// Determine quantity to pick up
-	int32 QuantityToAdd = 1;
-
-	// In Lyra, initial stats (like stack count) are often defined in the ItemDefinition's fragments.
-	// If there's a Fragment_SetStats that defines a stack count, we can use that as the default.
-	if (const UInventoryFragment_SetStats* SetStatsFragment = Cast<UInventoryFragment_SetStats>(Def->FindFragmentByClass(UInventoryFragment_SetStats::StaticClass())))
+	if (AddedCount > 0)
 	{
-		int32 FragmentQuantity = SetStatsFragment->GetStatTagStackCount(FragmentTags::StackableFragment);
-		if (FragmentQuantity > 0)
-		{
-			QuantityToAdd = FragmentQuantity;
-		}
-	}
-	
-	// Try to find a free slot or stackable slot
-	int32 TargetSlotIndex = INDEX_NONE;
-	const int32 NumSlots = InventoryComponent->GetNumSlots(TargetContainerIdx);
-	for (int32 i = 0; i < NumSlots; ++i)
-	{
-		UInventoryItemInstance* Existing = InventoryComponent->GetItemInstanceInSlot(i, TargetContainerIdx);
-		if (!Existing)
-		{
-			TargetSlotIndex = i;
-			break;
-		}
-		// Optional: Implement stack merging logic here if desired
-	}
-
-	if (TargetSlotIndex != INDEX_NONE)
-	{
-		InventoryComponent->AddItemDefinition(const_cast<UInventoryItemDefinition*>(Def), TargetSlotIndex, TargetContainerIdx, QuantityToAdd);
-		
 		if (GetOwner() && GetOwner()->HasAuthority())
 		{
-			GetOwner()->Destroy();
+			CurrentStackCount -= AddedCount;
+			
+			if (CurrentStackCount <= 0)
+			{
+				GetOwner()->Destroy();
+			}
+			else
+			{
+				UE_LOG(LogTemp, Log, TEXT("Interact: Partial pickup. %d items remaining in world."), CurrentStackCount);
+			}
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Interact: No free slot in container %d"), TargetContainerIdx);
+		UE_LOG(LogTemp, Warning, TEXT("Interact: Inventory full, could not pick up anything"));
 	}
 }
 

@@ -5,6 +5,7 @@
 
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryItemFragment.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
@@ -134,12 +135,21 @@ UInventoryItemInstance* FInventoryList::AddEntry(UInventoryItemDefinition* ItemD
         Fragment->OnInstanceCreated(NewEntry.Instance);
     }
 
-    // Falls ein spezifischer StackCount beim Hinzufügen übergeben wurde, setzen wir diesen.
-    // Das überschreibt ggf. Default-Werte aus Fragmenten (wie SetStats), was für gezieltes Aufheben wichtig ist.
-    if (StackCount > 0)
+    // Bestimme die maximale Stack-Größe aus dem Stackable-Fragment
+    int32 MaxStack = 1;
+    if (const UInventoryFragment_Stackable* StackableFragment = Cast<UInventoryFragment_Stackable>(ItemDefinition->FindFragmentByClass(UInventoryFragment_Stackable::StaticClass())))
     {
-        NewEntry.Instance->SetStatTagStackCount(FragmentTags::StackableFragment, StackCount);
+        MaxStack = StackableFragment->GetMaxStackSize();
     }
+
+    // Falls ein spezifischer StackCount beim Hinzufügen übergeben wurde, setzen wir diesen (überschreibt Fragmente).
+    // Ansonsten prüfen wir, was Fragmente (wie SetStats) ggf. bereits gesetzt haben.
+    int32 FinalCount = (StackCount > 0) ? StackCount : NewEntry.Instance->GetStatTagStackCount(FragmentTags::StackableFragment);
+
+    // Clamp auf MaxStackSize
+    FinalCount = FMath::Clamp(FinalCount, 1, MaxStack);
+    
+    NewEntry.Instance->SetStatTagStackCount(FragmentTags::StackableFragment, FinalCount);
 
     MarkItemDirty(NewEntry);
 
