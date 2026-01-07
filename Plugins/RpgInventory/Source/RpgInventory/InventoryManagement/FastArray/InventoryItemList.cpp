@@ -4,6 +4,7 @@
 #include "InventoryItemList.h"
 
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryItemFragment.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
@@ -131,7 +132,13 @@ UInventoryItemInstance* FInventoryList::AddEntry(UInventoryItemDefinition* ItemD
     for (UInventoryItemFragment* Fragment : ItemDefinition->GetFragments())
     {
         Fragment->OnInstanceCreated(NewEntry.Instance);
-        Fragment->OnStackInitialized(NewEntry.Instance, StackCount);
+    }
+
+    // Falls ein spezifischer StackCount beim Hinzufügen übergeben wurde, setzen wir diesen.
+    // Das überschreibt ggf. Default-Werte aus Fragmenten (wie SetStats), was für gezieltes Aufheben wichtig ist.
+    if (StackCount > 0)
+    {
+        NewEntry.Instance->SetStatTagStackCount(FragmentTags::StackableFragment, StackCount);
     }
 
     MarkItemDirty(NewEntry);

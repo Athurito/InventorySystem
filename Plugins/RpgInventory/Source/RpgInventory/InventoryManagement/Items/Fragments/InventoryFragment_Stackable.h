@@ -17,7 +17,6 @@ class UInventoryFragment_Stackable : public UInventoryItemFragment
 public:
 	
 	int32 GetMaxStackSize() const { return MaxStackSize; }
-	virtual void OnStackInitialized(UInventoryItemInstance* Instance, int32 StackCount) const override;
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Inventory")

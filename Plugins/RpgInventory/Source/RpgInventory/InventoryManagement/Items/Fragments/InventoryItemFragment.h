@@ -18,5 +18,4 @@ class UInventoryItemFragment : public UObject
 public:
 	
 	virtual void OnInstanceCreated(UInventoryItemInstance* Instance) const {}
-	virtual void OnStackInitialized(UInventoryItemInstance* Instance, int32 StackCount) const {}
 };

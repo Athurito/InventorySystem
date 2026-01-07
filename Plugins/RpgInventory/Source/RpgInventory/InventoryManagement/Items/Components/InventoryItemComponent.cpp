@@ -11,6 +11,8 @@
 #include "GameFramework/Controller.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Pickup.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_SetStats.h"
 #include "RpgInventory/InventoryManagement/Utils/InventoryStatics.h"
 
 void UInventoryItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -46,6 +48,10 @@ void UInventoryItemComponent::InitItemById(FPrimaryAssetId Id)
 {
 	check(GetOwner() && GetOwner()->HasAuthority());
 	
+	if (UInventoryItemDefinition* Def = UInventoryStatics::GetItemDefinitionById(Id))
+	{
+		InitItemByDefinition(Def);
+	}
 }
 
 void UInventoryItemComponent::InitItemBySoft(TSoftObjectPtr<UInventoryItemDefinition> Soft)
@@ -57,30 +63,39 @@ void UInventoryItemComponent::InitItemBySoft(TSoftObjectPtr<UInventoryItemDefini
 
 void UInventoryItemComponent::OnRep_ItemId()
 {
-	ItemDefinition = nullptr;
-
-	if (!ItemId.IsValid()) return;
+	if (!ItemId.IsValid())
+	{
+		ItemDefinition = nullptr;
+		return;
+	}
 
 	FSoftObjectPath Path = UAssetManager::Get().GetPrimaryAssetPath(ItemId);
 	if (Path.IsValid())
 	{
-		if (UObject* Obj = Path.TryLoad()) // für kleine DataAssets ok; sonst async
+		if (UObject* Obj = Path.TryLoad())
 		{
-			// ItemDefinition = Cast<UInventoryItemDefinition>(Obj);
-			// Initialize/refresh runtime data on clients when definition arrives
-			// InitRuntimeFromDefinition(ItemDefinition.Get());
+			ItemDefinition = Cast<UInventoryItemDefinition>(Obj);
 		}
 	}
 }
 
 FInteractDisplayData UInventoryItemComponent::GetDisplayData_Implementation() const
 {
-	if (!bEnabled || !ItemDefinition) return FInteractDisplayData();
-
 	FInteractDisplayData Data;
-	
-	// Data.ActionText = ItemDefinition->GetInteractionText();
-	
+	if (!bEnabled) return Data;
+
+	const UInventoryItemDefinition* Def = GetItemDefinition();
+	if (!Def) return Data;
+
+	if (const UInventoryFragment_Pickup* PickupFragment = Cast<UInventoryFragment_Pickup>(Def->FindFragmentByClass(UInventoryFragment_Pickup::StaticClass())))
+	{
+		Data.ActionText = PickupFragment->GetInteractionText();
+	}
+	else
+	{
+		Data.ActionText = FText::Format(NSLOCTEXT("Inventory", "PickupAction", "Pick up {0}"), FText::FromName(Def->GetFName()));
+	}
+
 	return Data;
 }
 
@@ -136,86 +151,51 @@ void UInventoryItemComponent::Interact_Implementation(APawn* Instigator)
 	// 	}
 	// }
 
-	// // 2) Otherwise: attempt to pick up into an appropriate container
-	// const FGameplayTag ItemType = Def->GetItemType();
-	// int32 TargetContainerIdx = INDEX_NONE;
-	// // Find first container that allows this item type
-	// for (int32 i = 0; i < InventoryComponent->Containers.Num(); ++i)
-	// {
-	// 	if (InventoryComponent->Containers[i].IsItemAllowed(ItemType))
-	// 	{
-	// 		TargetContainerIdx = i;
-	// 		break;
-	// 	}
-	// }
-	// if (TargetContainerIdx == INDEX_NONE)
-	// {
-	// 	UE_LOG(LogTemp, Warning, TEXT("Interact: No accepting container for item type %s"), *ItemType.ToString());
-	// 	return;
-	// }
-	//
-	// // Determine quantity to pick up
-	// int32 QuantityToAdd = 1;
-	// if (Def->GetFragmentOfTypeWithTag<FInventoryFragment_Stackable>(FragmentTags::StackableFragment))
-	// {
-	// 	QuantityToAdd = FMath::Max(1, GetCurrentStackCount());
-	// }
-	//
-	// int32 OutAdded = 0; FGuid OutInstanceId;
-	// const bool bRequested = InventoryComponent->AddItemToContainer(TargetContainerIdx, this, QuantityToAdd, OutAdded, OutInstanceId);
-	//
-	// // If we are on the server, reduce or destroy the world item based on how much was actually added
-	// if (GetOwner() && GetOwner()->HasAuthority())
-	// {
-	// 	if (OutAdded > 0)
-	// 	{
-	// 		AActor* OwnerActor = GetOwner();
-	// 		const bool bIsStackable =
-	// 			(Def->GetFragmentOfTypeWithTag<FInventoryFragment_Stackable>(FragmentTags::StackableFragment) != nullptr);
-	//
-	// 		if (bIsStackable)
-	// 		{
-	// 			// Aktuellen Wert nur lesen (legt nichts an)
-	// 			const FStackableRuntimeData* StackConst =
-	// 				RuntimeData.FindConst<FStackableRuntimeData>(FragmentTags::StackableFragment);
-	//
-	// 			// Fallback: wenn noch kein RuntimeData existiert, verhalte dich wie „1 vor Abzug“
-	// 			const int32 Current = StackConst ? StackConst->CurrentStackCount : 1;
-	// 			const int32 NewCount = FMath::Max(0, Current - OutAdded);
-	//
-	// 			bool bBecameZero = false;
-	// 			// Schreiben: legt bei Bedarf an + markiert automatisch dirty
-	// 			RuntimeData.Modify<FStackableRuntimeData>(FragmentTags::StackableFragment,
-	// 				[&](FStackableRuntimeData& D)
-	// 				{
-	// 					D.CurrentStackCount = NewCount;
-	// 					bBecameZero = (D.CurrentStackCount <= 0);
-	// 				});
-	//
-	// 			if (bBecameZero && OwnerActor)
-	// 			{
-	// 				OwnerActor->Destroy();
-	// 			}
-	// 		}
-	// 		else
-	// 		{
-	// 			// Non-stackable: sobald etwas entnommen wurde, Actor zerstören
-	// 			if (OwnerActor)
-	// 			{
-	// 				OwnerActor->Destroy();
-	// 			}
-	// 		}
-	// 	}
-	// 	else
-	// 	{
-	// 		UE_LOG(LogTemp, Warning, TEXT("Interact: AddItemToContainer added nothing (full or disallowed)"));
-	// 	}
-	// }
-	// else
-	// {
-	// 	// On clients we just requested via RPC; the server will replicate inventory and possibly destroy the world item.
-	// 	UE_LOG(LogTemp, Verbose, TEXT("Interact: Pickup requested (client), waiting for replication"));
-	// }
+	// 2) Otherwise: attempt to pick up into an appropriate container
+	const FGameplayTag ItemType = Def->GetItemType();
+	int32 TargetContainerIdx = 0; // Default to first container for now
+	
+	// Determine quantity to pick up
+	int32 QuantityToAdd = 1;
+
+	// In Lyra, initial stats (like stack count) are often defined in the ItemDefinition's fragments.
+	// If there's a Fragment_SetStats that defines a stack count, we can use that as the default.
+	if (const UInventoryFragment_SetStats* SetStatsFragment = Cast<UInventoryFragment_SetStats>(Def->FindFragmentByClass(UInventoryFragment_SetStats::StaticClass())))
+	{
+		int32 FragmentQuantity = SetStatsFragment->GetStatTagStackCount(FragmentTags::StackableFragment);
+		if (FragmentQuantity > 0)
+		{
+			QuantityToAdd = FragmentQuantity;
+		}
+	}
+	
+	// Try to find a free slot or stackable slot
+	int32 TargetSlotIndex = INDEX_NONE;
+	const int32 NumSlots = InventoryComponent->GetNumSlots(TargetContainerIdx);
+	for (int32 i = 0; i < NumSlots; ++i)
+	{
+		UInventoryItemInstance* Existing = InventoryComponent->GetItemInstanceInSlot(i, TargetContainerIdx);
+		if (!Existing)
+		{
+			TargetSlotIndex = i;
+			break;
+		}
+		// Optional: Implement stack merging logic here if desired
+	}
+
+	if (TargetSlotIndex != INDEX_NONE)
+	{
+		InventoryComponent->AddItemDefinition(const_cast<UInventoryItemDefinition*>(Def), TargetSlotIndex, TargetContainerIdx, QuantityToAdd);
+		
+		if (GetOwner() && GetOwner()->HasAuthority())
+		{
+			GetOwner()->Destroy();
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Interact: No free slot in container %d"), TargetContainerIdx);
+	}
 }
 
 void UInventoryItemComponent::BeginPlay()
@@ -223,11 +203,11 @@ void UInventoryItemComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// Level-platziert: Server übernimmt InitialDefinition einmalig
-	// if (GetOwner() && GetOwner()->HasAuthority() && InitialDefinition.IsValid())
-	// {
-	// 	UInventoryItemDefinition* Def = InitialDefinition.Get();
-	// 	if (!Def) Def = InitialDefinition.LoadSynchronous();
-	// 	InitItemByDefinition(Def);
-	// }
+	if (GetOwner() && GetOwner()->HasAuthority() && ItemDefinition.IsValid())
+	{
+		UInventoryItemDefinition* Def = ItemDefinition.Get();
+		if (!Def) Def = ItemDefinition.LoadSynchronous();
+		InitItemByDefinition(Def);
+	}
 }
 

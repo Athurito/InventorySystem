@@ -11,17 +11,16 @@
 
 UInventoryItemDefinition* UInventoryStatics::GetItemDefinitionById(const FPrimaryAssetId& ItemId)
 {
-	UInventoryItemDefinition* Def = nullptr;
 	if (UAssetManager* AM = UAssetManager::GetIfInitialized())
 	{
 		const FSoftObjectPath Path = AM->GetPrimaryAssetPath(ItemId);
 		if (Path.IsValid())
 		{
 			UObject* Obj = AM->GetStreamableManager().LoadSynchronous(Path, false);
-			// Def = Cast<UInventoryItemDefinition>(Obj);
+			return Cast<UInventoryItemDefinition>(Obj);
 		}
 	}
-	return Def;
+	return nullptr;
 }
 
 UInventoryManagerComponent* UInventoryStatics::GetContainerComponent(AActor* Owner)
