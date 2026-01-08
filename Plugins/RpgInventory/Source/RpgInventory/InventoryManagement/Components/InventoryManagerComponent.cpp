@@ -160,9 +160,35 @@ EInventoryClickAction UInventoryManagerComponent::GetInventoryClickAction() cons
 	return InventoryClickAction;
 }
 
+void UInventoryManagerComponent::QueueSlotRefresh(int32 C, int32 S)
+{
+	const int64 Key = ( (int64)C << 32 ) | (uint32)S;
+	PendingSlotRefresh.Add(Key);
+
+	if (!bFlushScheduled && GetWorld())
+	{
+		bFlushScheduled = true;
+		GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(
+			this, &UInventoryManagerComponent::FlushQueuedSlotRefresh));
+	}
+}
+
+void UInventoryManagerComponent::FlushQueuedSlotRefresh()
+{
+	bFlushScheduled = false;
+
+	for (int64 Key : PendingSlotRefresh)
+	{
+		const int32 C = (int32)(Key >> 32);
+		const int32 S = (int32)(Key & 0xFFFFFFFF);
+		BroadcastSlotChanged(C, S);
+	}
+	PendingSlotRefresh.Reset();
+}
+
 void UInventoryManagerComponent::HandleDrop_Internal(UInventoryManagerComponent* SourceManager, int32 SourceContainerIndex,
-                                            int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity,
-                                            FGameplayTag OperationType)
+                                                     int32 SourceSlotIndex, int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity,
+                                                     FGameplayTag OperationType)
 {
 	if (!SourceManager)
 	{

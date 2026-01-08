@@ -42,7 +42,7 @@ void FInventoryList::PreReplicatedRemove(const TArrayView<int32> RemovedIndices,
                 // *** WICHTIG: Instanz auf dem Client vor dem Broadcast nullen ***
                 E.Instance = nullptr;
 
-                Manager->BroadcastSlotChanged(CIdx, SIdx);
+                Manager->QueueSlotRefresh(CIdx, SIdx);
             }
         }
     }
@@ -72,7 +72,7 @@ void FInventoryList::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int
                 const int32 CIdx = Entries[Idx].ContainerIndex;
                 const int32 SIdx = Entries[Idx].SlotIndex;
                 
-                Manager->BroadcastSlotChanged(CIdx, SIdx);
+                Manager->QueueSlotRefresh(CIdx, SIdx);
             }
         }
     }
@@ -96,7 +96,7 @@ void FInventoryList::PostReplicatedChange(const TArrayView<int32> ChangedIndices
             {
                 const int32 CIdx = Entries[Idx].ContainerIndex;
                 const int32 SIdx = Entries[Idx].SlotIndex;
-                Manager->BroadcastSlotChanged(CIdx, SIdx);
+                Manager->QueueSlotRefresh(CIdx, SIdx);
             }
         }
     }
@@ -194,7 +194,17 @@ void FInventoryList::RemoveEntry(UInventoryItemInstance* Instance)
             RemovedContainer = Entries[i].ContainerIndex;
             RemovedSlot      = Entries[i].SlotIndex;
 
+            const int32 LastIndex = Entries.Num() - 1;
+            const bool bWillSwap  = (i != LastIndex);
+
             Entries.RemoveAtSwap(i);
+
+            // Wenn ein anderes Element in Index i "reingerutscht" ist, muss es dirty werden
+            if (bWillSwap && Entries.IsValidIndex(i))
+            {
+                MarkItemDirty(Entries[i]);
+            }
+
             MarkArrayDirty();
             break;
         }
@@ -204,6 +214,7 @@ void FInventoryList::RemoveEntry(UInventoryItemInstance* Instance)
     {
         if (UInventoryManagerComponent* Manager = Cast<UInventoryManagerComponent>(OwnerComponent))
         {
+            
             Manager->BroadcastSlotChanged(RemovedContainer, RemovedSlot);
         }
     }

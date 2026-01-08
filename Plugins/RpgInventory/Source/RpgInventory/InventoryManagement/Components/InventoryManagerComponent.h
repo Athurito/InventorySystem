@@ -89,6 +89,9 @@ public:
 	
 	FInventoryList&       GetInventoryList()       { return InventoryList; }
 	const FInventoryList& GetInventoryList() const { return InventoryList; }
+	
+	void QueueSlotRefresh(int32 C, int32 S);
+	
 
 protected:
 	virtual void BeginPlay() override;
@@ -104,6 +107,12 @@ private:
 	TArray<TObjectPtr<UInventoryContainerDefinition>> DefaultContainerDefinitions;
 	UPROPERTY(Replicated)
 	FInventoryList InventoryList;
+	
+	// UI hooks for client
+	UPROPERTY(Transient)
+	TSet<int64> PendingSlotRefresh; // key = (Container<<32 | Slot)
+	void FlushQueuedSlotRefresh();
+	bool bFlushScheduled = false;
 	
 	
 	//Drag drop..
