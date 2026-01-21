@@ -82,6 +82,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	TArray<UInventoryItemInstance*> GetAllItems(int32 ContainerIndex) const;
 	
+	const UInventoryContainerDefinition* GetContainerDefinition(int32 ContainerIndex) const;
+
 	UFUNCTION(BlueprintCallable,Category="Inventory")
 	void SetInventoryClickAction(EInventoryClickAction Action);
 	UFUNCTION(BlueprintCallable,Category="Inventory")

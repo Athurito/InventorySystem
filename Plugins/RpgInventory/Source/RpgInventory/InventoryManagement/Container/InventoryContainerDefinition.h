@@ -31,4 +31,8 @@ public:
 
 	// Optional für UI
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) UTexture2D* TabIcon = nullptr;
+
+	// Mapping von Slot-Index zu Gameplay Tag (für Equipment-Slots)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	TMap<int32, FGameplayTag> SlotTagMapping;
 };

@@ -11,6 +11,7 @@
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
 
 UInventoryManagerComponent::UInventoryManagerComponent()
 {
@@ -148,6 +149,15 @@ void UInventoryManagerComponent::RemoveItemInstance(UInventoryItemInstance* Inst
 TArray<UInventoryItemInstance*> UInventoryManagerComponent::GetAllItems(int32 ContainerIndex) const
 {
 	return InventoryList.GetAllItemsInContainer(ContainerIndex);
+}
+
+const UInventoryContainerDefinition* UInventoryManagerComponent::GetContainerDefinition(int32 ContainerIndex) const
+{
+	if (DefaultContainerDefinitions.IsValidIndex(ContainerIndex))
+	{
+		return DefaultContainerDefinitions[ContainerIndex];
+	}
+	return nullptr;
 }
 
 void UInventoryManagerComponent::SetInventoryClickAction(EInventoryClickAction Action)
@@ -637,6 +647,29 @@ bool UInventoryManagerComponent::CanPlaceInContainer(UInventoryItemInstance* Sou
 	int32 TargetSlotIndex) const
 {
 	if (!SourceItem) return false;
+
+	const UInventoryContainerDefinition* ContainerDef = GetContainerDefinition(TargetContainerIndex);
+	if (!ContainerDef) return false;
+
+	// Check Slot Type
+	if (ContainerDef->Type == EInventorySlotType::Equipment)
+	{
+		const UInventoryFragment_Equippable* EquipFrag = SourceItem->FindFragmentByClass<UInventoryFragment_Equippable>();
+		if (!EquipFrag)
+		{
+			return false; // Not equippable
+		}
+
+		// Check if this specific slot is supported by the item
+		if (ContainerDef->SlotTagMapping.Contains(TargetSlotIndex))
+		{
+			FGameplayTag SlotTag = ContainerDef->SlotTagMapping[TargetSlotIndex];
+			if (!EquipFrag->SupportedSlots.HasTag(SlotTag))
+			{
+				return false; // Slot mismatch
+			}
+		}
+	}
 	
 	return true;
 }
