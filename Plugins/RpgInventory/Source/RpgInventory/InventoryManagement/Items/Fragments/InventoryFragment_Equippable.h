@@ -20,7 +20,7 @@ class RPGINVENTORY_API UInventoryFragment_Equippable : public UInventoryItemFrag
 public:
 	// The equipment definition that defines actors and abilities
 	UPROPERTY(EditAnywhere, Category = "Equipment")
-	TSubclassOf<URpgEquipmentDefinition> EquipmentDefinition;
+	TObjectPtr<const URpgEquipmentDefinition> EquipmentDefinition;
 
 	// Valid slots for this item
 	UPROPERTY(EditAnywhere, Category = "Equipment")

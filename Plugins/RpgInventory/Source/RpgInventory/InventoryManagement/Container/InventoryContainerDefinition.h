@@ -12,7 +12,7 @@
  */
 
 UENUM(BlueprintType)
-enum class EInventorySlotType : uint8 { Generic, Consumable, Quest, Equipment };
+enum class EInventorySlotType : uint8 { Generic, Consumable, Quest, Equipment, Hotbar };
 
 UCLASS()
 class RPGINVENTORY_API UInventoryContainerDefinition : public UDataAsset

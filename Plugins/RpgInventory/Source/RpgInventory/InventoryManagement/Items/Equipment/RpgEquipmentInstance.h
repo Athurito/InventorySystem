@@ -20,13 +20,19 @@ class RPGINVENTORY_API URpgEquipmentInstance : public UObject
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
+	virtual bool IsSupportedForNetworking() const override { return true; }
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UPROPERTY(Replicated)
 	TObjectPtr<UInventoryItemInstance> SourceItem;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	TArray<TObjectPtr<AActor>> SpawnedActors;
 
+	UPROPERTY(Replicated)
 	TArray<FGameplayAbilitySpecHandle> AbilityHandles;
+
+	UPROPERTY(Replicated)
 	TArray<FActiveGameplayEffectHandle> EffectHandles;
 
 	void DestroySpawnedActors();

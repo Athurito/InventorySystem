@@ -38,16 +38,25 @@ class RPGINVENTORY_API URpgEquipmentManagerComponent : public UActorComponent
 
 public:
 	URpgEquipmentManagerComponent();
+	virtual bool ReplicateSubobjects(class UActorChannel* Channel, class FOutBunch* Bunch, FReplicationFlags* RepFlags) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	void Initialize(UInventoryManagerComponent* InInventoryManager);
 
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	void SetActiveHotbarSlot(int32 ContainerIndex, int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	void UseActiveItem();
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	UFUNCTION()
 	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
 
-	void EquipItem(FGameplayTag SlotTag, UInventoryItemInstance* ItemInstance);
+	void EquipItem(FGameplayTag SlotTag, UInventoryItemInstance* ItemInstance, bool bIsDynamic = false);
 	void UnequipItem(FGameplayTag SlotTag);
 
 	UAbilitySystemComponent* GetAbilitySystemComponent() const;
@@ -56,8 +65,12 @@ private:
 	UPROPERTY()
 	TObjectPtr<UInventoryManagerComponent> InventoryManager;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	TArray<FRpgEquipmentEntry> EquipmentEntries;
+
+	// New: Track active hotbar slot
+	int32 ActiveHotbarContainerIndex = INDEX_NONE;
+	int32 ActiveHotbarSlotIndex = INDEX_NONE;
 
 	// Helper to find which slot a container/slot index refers to
 	FGameplayTag GetSlotTagForInventorySlot(int32 ContainerIndex, int32 SlotIndex) const;

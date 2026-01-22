@@ -29,8 +29,8 @@ struct FRpgEquipmentActorToSpawn
 /**
  * Definition of an equipment item, similar to Lyra.
  */
-UCLASS(BlueprintType, Const)
-class RPGINVENTORY_API URpgEquipmentDefinition : public UDataAsset
+UCLASS(BlueprintType, Const, Blueprintable)
+class RPGINVENTORY_API URpgEquipmentDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 
