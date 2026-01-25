@@ -102,39 +102,63 @@ void URpgEquipmentManagerComponent::OnInventorySlotChanged(int32 ContainerIndex,
 	
 	UE_LOG(LogTemp, Log, TEXT("[RpgEquipment] OnInventorySlotChanged: Container=%d, Slot=%d, Tag=%s"), ContainerIndex, SlotIndex, *SlotTag.ToString());
 
-	// If it's not a permanent slot tag, check if it's our active hotbar slot
+	// Check if this slot IS an equipment/hotbar slot (even if mapping is missing)
+	const UInventoryContainerDefinition* ContainerDef = InventoryManager ? InventoryManager->GetContainerDefinition(ContainerIndex) : nullptr;
+	bool bIsEquipmentContainer = ContainerDef && (ContainerDef->Type == EInventorySlotType::Equipment || ContainerDef->Type == EInventorySlotType::Hotbar);
+	
+	// If it's a dynamic hotbar slot, it counts even if SlotTag is empty
 	bool bIsActiveHotbarSlot = (ContainerIndex == ActiveHotbarContainerIndex && SlotIndex == ActiveHotbarSlotIndex);
 	
-	if (!SlotTag.IsValid() && !bIsActiveHotbarSlot) return;
+	if (!bIsEquipmentContainer && !bIsActiveHotbarSlot) return;
 
 	UInventoryItemInstance* ItemInstance = InventoryManager->GetItemInstanceInSlot(SlotIndex, ContainerIndex);
 	
-	UE_LOG(LogTemp, Log, TEXT("[RpgEquipment] Item in slot: %s"), ItemInstance ? *ItemInstance->GetName() : TEXT("NULL"));
-
-	// Check what's currently in our record
+	// 1. Look for existing entry associated with this SlotTag (Permanent) or with the dynamic slot logic
 	FRpgEquipmentEntry* FoundEntry = nullptr;
-	for (FRpgEquipmentEntry& Entry : EquipmentEntries)
+	int32 FoundEntryIndex = INDEX_NONE;
+
+	for (int32 i = 0; i < EquipmentEntries.Num(); ++i)
 	{
-		if (Entry.SlotTag == SlotTag)
+		// Match by SlotTag (for permanent slots)
+		if (SlotTag.IsValid() && EquipmentEntries[i].SlotTag == SlotTag)
 		{
-			FoundEntry = &Entry;
+			FoundEntry = &EquipmentEntries[i];
+			FoundEntryIndex = i;
 			break;
 		}
 	}
 
+	// 2. Handle State Change
 	if (ItemInstance)
 	{
+		// Item added or changed in slot
 		if (FoundEntry)
 		{
-			if (FoundEntry->ItemInstance == ItemInstance) return; // No change
+			if (FoundEntry->ItemInstance == ItemInstance)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[RpgEquipment] Item %s already equipped in %s, skipping."), *ItemInstance->GetName(), *SlotTag.ToString());
+				return;
+			}
+			
+			UE_LOG(LogTemp, Log, TEXT("[RpgEquipment] Slot %s changed item, unequipping old."), *SlotTag.ToString());
 			UnequipItem(SlotTag);
 		}
-		EquipItem(SlotTag, ItemInstance, bIsActiveHotbarSlot);
+
+		if (SlotTag.IsValid() || bIsActiveHotbarSlot)
+		{
+			EquipItem(SlotTag, ItemInstance, bIsActiveHotbarSlot);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[RpgEquipment] Slot %d in Container %d has no Tag Mapping! Item %s cannot be equipped visually."), SlotIndex, ContainerIndex, *ItemInstance->GetName());
+		}
 	}
 	else
 	{
+		// Item removed from slot
 		if (FoundEntry)
 		{
+			UE_LOG(LogTemp, Log, TEXT("[RpgEquipment] Item removed from %s, unequipping."), *SlotTag.ToString());
 			UnequipItem(SlotTag);
 		}
 	}
