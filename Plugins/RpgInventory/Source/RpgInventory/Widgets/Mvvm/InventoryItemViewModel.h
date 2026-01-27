@@ -43,7 +43,7 @@ public:
 
     UPROPERTY(BlueprintReadOnly, FieldNotify)
     TSoftObjectPtr<UTexture2D> Icon;
-
+    
     UPROPERTY(BlueprintReadOnly, FieldNotify)
     int32 DurabilityCurrent = 0;
 

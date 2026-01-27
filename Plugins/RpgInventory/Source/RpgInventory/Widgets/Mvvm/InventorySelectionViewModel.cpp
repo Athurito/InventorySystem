@@ -14,6 +14,11 @@ void UInventorySelectionViewModel::SetSelectedItem(UInventoryItemViewModel* Item
 
 void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerComponent* InManager, int32 InContainerIndex)
 {
+    if (Manager.IsValid())
+    {   
+        Manager->OnInventorySlotChanged.RemoveDynamic(this, &UInventorySelectionViewModel::OnManagerSlotChanged);
+    }
+    
     Manager = InManager;
     ContainerIndex = InContainerIndex;
 
@@ -53,7 +58,7 @@ void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerCompon
 
     // Abonniere Manager-Events
     if (Manager.IsValid())
-    {
+    {   
         Manager->OnInventorySlotChanged.AddUniqueDynamic(this, &UInventorySelectionViewModel::OnManagerSlotChanged);
     }
 }

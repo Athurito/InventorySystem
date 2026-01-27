@@ -4,11 +4,7 @@
 #include "CommonUserWidget.h"
 #include "ContainerGrid.generated.h"
 
-struct FInventoryEntry;
-class UContainerSlotButton;
 class UInventoryManagerComponent;
-class UUniformGridPanel;
-struct FInv_InventoryEntry;
 
 UENUM(BlueprintType)
 enum class EInventorySourceType : uint8
