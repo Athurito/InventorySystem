@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "ContainerGrid.generated.h"
 
 class UInventoryManagerComponent;
@@ -19,6 +20,12 @@ class RPGINVENTORY_API UContainerGrid : public UCommonUserWidget
 	GENERATED_BODY()
 
 public:
+	// Manuelle Aktivierung/Deaktivierung, da dieses Widget meist eingebettet ist
+	UFUNCTION(BlueprintCallable, Category="Container|UI")
+	void ActivateWidget();
+
+	UFUNCTION(BlueprintCallable, Category="Container|UI")
+	void DeactivateWidget();
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Container|UI")
 	EInventorySourceType SourceType = EInventorySourceType::Player;
 	
@@ -37,7 +44,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Container|UI")
 	int32 PlayerContainerIndex = 0;
+
+	/** Name des ViewModels im MVVM-Panel des Widgets. Erlaubt dynamisches Binding ohne Hardcoding. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Container|UI")
+	FName ViewModelName = FName("InventoryViewModel");
 	
 protected:
+	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 };

@@ -34,7 +34,9 @@ UObject* UInventoryContainerResolver::CreateInstance(const UClass* ExpectedType,
 			ExpectedType
 		);
 
+	// Wenn wir bereits einen Manager haben, initialisieren wir ihn direkt.
+	// Das löst das Problem, falls ActivateWidget() zu früh oder gar nicht gerufen wird.
 	VM->InitializeFromManager(Manager, ContainerIndex);
-
+	
 	return VM;
 }

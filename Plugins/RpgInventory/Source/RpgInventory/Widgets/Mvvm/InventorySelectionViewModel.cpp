@@ -14,6 +14,12 @@ void UInventorySelectionViewModel::SetSelectedItem(UInventoryItemViewModel* Item
 
 void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerComponent* InManager, int32 InContainerIndex)
 {
+    // Verhindere unnötiges Re-Initialize, wenn Manager und Index gleich sind
+    if (Manager == InManager && ContainerIndex == InContainerIndex)
+    {
+        return;
+    }
+
     if (Manager.IsValid())
     {   
         Manager->OnInventorySlotChanged.RemoveDynamic(this, &UInventorySelectionViewModel::OnManagerSlotChanged);
@@ -60,6 +66,13 @@ void UInventorySelectionViewModel::InitializeFromManager(UInventoryManagerCompon
     if (Manager.IsValid())
     {   
         Manager->OnInventorySlotChanged.AddUniqueDynamic(this, &UInventorySelectionViewModel::OnManagerSlotChanged);
+    }
+    else
+    {
+        // Wenn kein Manager da ist, stellen wir sicher, dass wir leer sind (Cleanup)
+        Slots.Empty();
+        UE_MVVM_SET_PROPERTY_VALUE(TotalSlots, 0);
+        UE_MVVM_BROADCAST_FIELD_VALUE_CHANGED(Slots);
     }
 }
 

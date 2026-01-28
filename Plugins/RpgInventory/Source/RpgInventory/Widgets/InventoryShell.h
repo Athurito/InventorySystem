@@ -21,6 +21,8 @@ public:
 	
 protected:
 
+	UFUNCTION(BlueprintCallable, Category="Inventory|UI")
+	UWidget* GetPlayerInventory() const { return PlayerInventory; }
 	// Wird beim Aktivieren erneut angewandt, falls nötig
 	virtual void NativeOnActivated() override;
 
