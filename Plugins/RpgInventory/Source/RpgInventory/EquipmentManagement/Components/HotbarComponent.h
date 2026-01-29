@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "HotbarComponent.generated.h"
 
+class UInventoryManagerComponent;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API UHotbarComponent : public UActorComponent
@@ -13,15 +14,18 @@ class RPGINVENTORY_API UHotbarComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this component's properties
 	UHotbarComponent();
 
 protected:
-	// Called when the game starts
 	virtual void BeginPlay() override;
 
 public:
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-	                           FActorComponentTickFunction* ThisTickFunction) override;
+	UFUNCTION(BlueprintCallable, Category="Hotbar")
+	void UseHotbarSlot(int32 SlotIndex);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UInventoryManagerComponent> InventoryManager;
+
+	int32 HotbarContainerIndex = INDEX_NONE;
 };

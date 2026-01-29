@@ -17,6 +17,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UTexture2D* GetIcon() const;
 	TSoftObjectPtr<UTexture2D> GetIconSoft() const;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory")
+	FText DisplayName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory")
+	FText Description;
+
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TSoftObjectPtr<UTexture2D> Icon;

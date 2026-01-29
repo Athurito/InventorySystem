@@ -64,6 +64,15 @@ public:
 
 	int32 GetNumSlots(int32 ContainerIndex) const;
 
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	int32 GetFirstContainerIndexByType(EInventorySlotType Type) const;
+
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	UInventoryContainerDefinition* GetContainerDefinition(int32 ContainerIndex) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	void UseItem(int32 ContainerIndex, int32 SlotIndex);
+
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
 	

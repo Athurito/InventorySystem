@@ -14,6 +14,8 @@ void UInventoryItemViewModel::SetFromItemInstance(UInventoryItemInstance* Instan
     ContainerIndex = InContainerIndex;
     SlotIndex = InSlotIndex;
     
+    FillFromContainerDefinition();
+
     UE_MVVM_SET_PROPERTY_VALUE(bIsEmpty, (Instance == nullptr));
     if (bIsEmpty)
     {
@@ -29,6 +31,7 @@ void UInventoryItemViewModel::ClearSlot()
 {
     UE_MVVM_SET_PROPERTY_VALUE(ItemInstance, nullptr);
     UE_MVVM_SET_PROPERTY_VALUE(DisplayName, FText::GetEmpty());
+    UE_MVVM_SET_PROPERTY_VALUE(Description, FText::GetEmpty());
     UE_MVVM_SET_PROPERTY_VALUE(Icon, TSoftObjectPtr<UTexture2D>()); // leerer SoftPtr
     UE_MVVM_SET_PROPERTY_VALUE(DurabilityCurrent, 0);
     UE_MVVM_SET_PROPERTY_VALUE(DurabilityMax, 0);
@@ -49,6 +52,8 @@ void UInventoryItemViewModel::FillFromDefinition()
     if (const UInventoryFragment_Hud* HudFragment = ItemInstance->FindFragmentByClass<UInventoryFragment_Hud>())
     {
         UE_MVVM_SET_PROPERTY_VALUE(Icon, HudFragment->GetIconSoft());
+        UE_MVVM_SET_PROPERTY_VALUE(DisplayName, HudFragment->DisplayName);
+        UE_MVVM_SET_PROPERTY_VALUE(Description, HudFragment->Description);
     }
 }
 
@@ -57,4 +62,20 @@ void UInventoryItemViewModel::FillFromStatTags()
     if (ItemInstance == nullptr) return;
     
     UE_MVVM_SET_PROPERTY_VALUE(CurrentStackCount, ItemInstance->GetStatTagStackCount(FragmentTags::StackableFragment));
+}
+
+void UInventoryItemViewModel::FillFromContainerDefinition()
+{
+    if (!Manager.IsValid()) return;
+    UInventoryContainerDefinition* Def = Manager->GetContainerDefinition(ContainerIndex);
+    if (!Def) return;
+
+    if (Def->SlotDefinitions.IsValidIndex(SlotIndex))
+    {
+        UE_MVVM_SET_PROPERTY_VALUE(BackgroundIcon, Def->SlotDefinitions[SlotIndex].BackgroundIcon);
+    }
+    else
+    {
+        UE_MVVM_SET_PROPERTY_VALUE(BackgroundIcon, TSoftObjectPtr<UTexture2D>());
+    }
 }

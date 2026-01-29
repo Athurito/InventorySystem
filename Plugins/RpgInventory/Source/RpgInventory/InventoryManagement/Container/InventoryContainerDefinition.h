@@ -12,7 +12,19 @@
  */
 
 UENUM(BlueprintType)
-enum class EInventorySlotType : uint8 { Generic, Consumable, Quest, Equipment };
+enum class EInventorySlotType : uint8 { Generic, Consumable, Quest, Equipment, Hotbar };
+
+USTRUCT(BlueprintType)
+struct FInventorySlotDefinition
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FGameplayTagQuery RequiredTags;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TSoftObjectPtr<UTexture2D> BackgroundIcon;
+};
 
 UCLASS()
 class RPGINVENTORY_API UInventoryContainerDefinition : public UDataAsset
@@ -28,6 +40,10 @@ public:
 
 	// Welche Items sind erlaubt? (optional – sonst alles)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) FGameplayTagQuery AllowedItems;
+
+	// Spezifische Einstellungen pro Slot
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TArray<FInventorySlotDefinition> SlotDefinitions;
 
 	// Optional für UI
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) UTexture2D* TabIcon = nullptr;

@@ -6,9 +6,14 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
+#include "AbilitySystemInterface.h"
 #include "RpgInventory/InventoryManagement/GameplayTags/InventoryOperationTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Consumable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 
@@ -637,7 +642,137 @@ bool UInventoryManagerComponent::CanPlaceInContainer(UInventoryItemInstance* Sou
 	int32 TargetSlotIndex) const
 {
 	if (!SourceItem) return false;
+
+	UInventoryContainerDefinition* ContainerDef = GetContainerDefinition(TargetContainerIndex);
+	if (!ContainerDef) return false;
+
+	// Sammle alle relevanten Tags vom Item
+	FGameplayTagContainer ItemTags;
 	
+	// Tags aus dem Equippable-Fragment (falls vorhanden)
+	if (const UInventoryFragment_Equippable* EquipFrag = SourceItem->FindFragmentByClass<UInventoryFragment_Equippable>())
+	{
+		ItemTags.AppendTags(EquipFrag->EquipmentTags);
+	}
+
+	// 1) Container-weite Prüfung
+	if (!ContainerDef->AllowedItems.IsEmpty())
+	{
+		if (!ContainerDef->AllowedItems.Matches(ItemTags))
+		{
+			return false;
+		}
+	}
+
+	// 2) Slot-spezifische Prüfung (z.B. für Equipment-Slots wie Kopf, Brust)
+	if (ContainerDef->SlotDefinitions.IsValidIndex(TargetSlotIndex))
+	{
+		const FInventorySlotDefinition& SlotDef = ContainerDef->SlotDefinitions[TargetSlotIndex];
+		if (!SlotDef.RequiredTags.IsEmpty())
+		{
+			if (!SlotDef.RequiredTags.Matches(ItemTags))
+			{
+				return false;
+			}
+		}
+	}
+
 	return true;
+}
+
+void UInventoryManagerComponent::UseItem(int32 ContainerIndex, int32 SlotIndex)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	UInventoryItemInstance* Item = GetItemInstanceInSlot(SlotIndex, ContainerIndex);
+	if (!Item) return;
+
+	// 1) Consumable-Logik
+	if (const UInventoryFragment_Consumable* ConsumableFrag = Item->FindFragmentByClass<UInventoryFragment_Consumable>())
+	{
+		// Sende Gameplay Event an den Owner (Character/Pawn)
+		if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+		{
+			if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+			{
+				FGameplayTag EventTag = ConsumableFrag->GetUseEventTag();
+				if (EventTag.IsValid())
+				{
+					FGameplayEventData Payload;
+					Payload.Instigator = GetOwner();
+					Payload.OptionalObject = Item;
+					ASC->HandleGameplayEvent(EventTag, &Payload);
+				}
+			}
+		}
+
+		// Stack reduzieren falls nötig
+		if (ConsumableFrag->ShouldReduceStack())
+		{
+			int32 CurrentCount = Item->GetStatTagStackCount(FragmentTags::StackableFragment);
+			int32 NewCount = CurrentCount - ConsumableFrag->GetQuantityPerUse();
+			
+			if (NewCount <= 0)
+			{
+				InventoryList.RemoveEntry(Item);
+			}
+			else
+			{
+				Item->SetStatTagStackCount(FragmentTags::StackableFragment, NewCount);
+				// Mark Dirty für Replikation
+				for (FInventoryEntry& Entry : InventoryList.Entries)
+				{
+					if (Entry.Instance == Item)
+					{
+						InventoryList.MarkItemDirty(Entry);
+						break;
+					}
+				}
+			}
+			BroadcastSlotChanged(ContainerIndex, SlotIndex);
+		}
+		return;
+	}
+
+	// 2) Equippable-Logik (Auto-Equip)
+	if (const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>())
+	{
+		int32 EquipContainerIdx = GetFirstContainerIndexByType(EInventorySlotType::Equipment);
+		if (EquipContainerIdx != INDEX_NONE)
+		{
+			int32 NumEquipSlots = GetNumSlots(EquipContainerIdx);
+			for (int32 i = 0; i < NumEquipSlots; ++i)
+			{
+				// Prüfen ob der Slot das Item akzeptiert (via Tags/Query)
+				if (CanPlaceInContainer(Item, EquipContainerIdx, i))
+				{
+					// Verschieben (nutzt interne Logik für Swap oder Move)
+					HandleDrop_Internal(this, ContainerIndex, SlotIndex, EquipContainerIdx, i, 0, FGameplayTag::EmptyTag);
+					return;
+				}
+			}
+		}
+	}
+}
+
+int32 UInventoryManagerComponent::GetFirstContainerIndexByType(EInventorySlotType Type) const
+{
+	for (int32 i = 0; i < DefaultContainerDefinitions.Num(); ++i)
+	{
+		if (DefaultContainerDefinitions[i] && DefaultContainerDefinitions[i]->Type == Type)
+		{
+			return i;
+		}
+	}
+	return INDEX_NONE;
+}
+
+UInventoryContainerDefinition* UInventoryManagerComponent::GetContainerDefinition(int32 ContainerIndex) const
+{
+	if (DefaultContainerDefinitions.IsValidIndex(ContainerIndex))
+	{
+		return DefaultContainerDefinitions[ContainerIndex];
+	}
+	return nullptr;
 }
 

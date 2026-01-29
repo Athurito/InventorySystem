@@ -42,7 +42,13 @@ public:
     FText DisplayName;
 
     UPROPERTY(BlueprintReadOnly, FieldNotify)
+    FText Description;
+
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
     TSoftObjectPtr<UTexture2D> Icon;
+
+    UPROPERTY(BlueprintReadOnly, FieldNotify)
+    TSoftObjectPtr<UTexture2D> BackgroundIcon;
     
     UPROPERTY(BlueprintReadOnly, FieldNotify)
     int32 DurabilityCurrent = 0;
@@ -65,4 +71,5 @@ private:
     
     void FillFromDefinition();
     void FillFromStatTags();
+    void FillFromContainerDefinition();
 };

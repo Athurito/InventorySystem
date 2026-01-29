@@ -32,11 +32,7 @@ UCLASS()
 class UInventoryFragment_Consumable : public UInventoryItemFragment
 {
 	GENERATED_BODY()
-
-	// Where can this item be used from?
-	UPROPERTY(EditAnywhere, Category = "Consumable|Use")
-	EUseAvailability UseAvailability = EUseAvailability::WorldOrInventory;
-
+	
 	// Optional: Event tag to trigger an already granted ability via GameplayEvent (Blueprint/editor-driven)
 	UPROPERTY(EditAnywhere, Category = "Consumable|Ability")
 	FGameplayTag UseEventTag;
@@ -65,8 +61,9 @@ class UInventoryFragment_Consumable : public UInventoryItemFragment
 	UPROPERTY(EditAnywhere, Category = "Consumable|Flow")
 	bool bAutoUseAfterPickup = false;
 	
-	// Fragment-centric helper methods (C++)
-	bool AllowsContext(EUseContext Ctx) const;
-	bool PreflightCanUse(const FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def) const;
-	bool ReduceStackAfterUse(FItemRuntimeDataContainer& Runtime, const UInventoryItemDefinition* Def, int32 Uses) const;
+public:
+
+	bool ShouldReduceStack() const { return bReduceStack; }
+	int32 GetQuantityPerUse() const { return QuantityPerUse; }
+	FGameplayTag GetUseEventTag() const { return UseEventTag; }
 };

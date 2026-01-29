@@ -4,8 +4,24 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayEffectTypes.h"
+#include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
 #include "EquipmentManagerComponent.generated.h"
 
+class UInventoryManagerComponent;
+class UInventoryItemInstance;
+
+USTRUCT()
+struct FActiveEquipmentSlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FActiveGameplayEffectHandle> AppliedEffects;
+
+	UPROPERTY()
+	TObjectPtr<USceneComponent> SpawnedComponent;
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API UEquipmentManagerComponent : public UActorComponent
@@ -17,4 +33,26 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
+
+	void RefreshSlot(int32 SlotIndex);
+
+	// Logik für konkrete Slots
+	virtual void OnItemEquipped(int32 SlotIndex, UInventoryItemInstance* ItemInstance);
+	virtual void OnItemUnequipped(int32 SlotIndex, UInventoryItemInstance* ItemInstance);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UInventoryManagerComponent> InventoryManager;
+
+	int32 EquipmentContainerIndex = INDEX_NONE;
+
+	// Speichert die aktuell ausgerüsteten Instanzen für den Vergleich
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInventoryItemInstance>> CurrentEquipment;
+
+	UPROPERTY(Transient)
+	TMap<int32, FActiveEquipmentSlot> ActiveSlots;
 };

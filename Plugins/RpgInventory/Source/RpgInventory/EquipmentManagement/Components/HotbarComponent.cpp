@@ -2,35 +2,46 @@
 
 
 #include "HotbarComponent.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
+#include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
+#include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 
-
-// Sets default values for this component's properties
 UHotbarComponent::UHotbarComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
-
-// Called when the game starts
 void UHotbarComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// ...
-	
+	// Falls die Komponente am Character hängt, suchen wir den InventoryManager am PlayerState
+	if (APawn* OwningPawn = Cast<APawn>(GetOwner()))
+	{
+		if (APlayerState* PS = OwningPawn->GetPlayerState())
+		{
+			InventoryManager = PS->FindComponentByClass<UInventoryManagerComponent>();
+		}
+	}
+
+	// Fallback: Falls die Komponente direkt am PlayerState hängen (empfohlen)
+	if (!InventoryManager)
+	{
+		InventoryManager = GetOwner()->FindComponentByClass<UInventoryManagerComponent>();
+	}
+
+	if (InventoryManager)
+	{
+		HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
+	}
 }
 
-
-// Called every frame
-void UHotbarComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                     FActorComponentTickFunction* ThisTickFunction)
+void UHotbarComponent::UseHotbarSlot(int32 SlotIndex)
 {
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (!InventoryManager || HotbarContainerIndex == INDEX_NONE) return;
 
-	// ...
+	InventoryManager->UseItem(HotbarContainerIndex, SlotIndex);
+	UE_LOG(LogTemp, Log, TEXT("Using item from Hotbar slot %d"), SlotIndex);
 }
 
