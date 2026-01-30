@@ -39,13 +39,21 @@ protected:
 
 	void RefreshSlot(int32 SlotIndex);
 
+	void UpdateMeshSocket(int32 SlotIndex, UInventoryItemInstance* ItemInstance);
+
 	// Logik für konkrete Slots
 	virtual void OnItemEquipped(int32 SlotIndex, UInventoryItemInstance* ItemInstance);
 	virtual void OnItemUnequipped(int32 SlotIndex, UInventoryItemInstance* ItemInstance);
 
+public:
+	void NotifyActiveSlotChanged(int32 NewActiveSlotIndex);
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryManagerComponent> InventoryManager;
+
+	UPROPERTY(Transient)
+	class UActiveItemComponent* ActiveItemComponent;
 
 	int32 EquipmentContainerIndex = INDEX_NONE;
 

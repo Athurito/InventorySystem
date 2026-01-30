@@ -34,4 +34,16 @@ public:
 	// Wo am Charakter soll das Mesh befestigt werden?
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
 	FName SocketName;
+
+	// Wo hängt das Item, wenn es NICHT aktiv ist? (z.B. Rücken, Hüfte)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
+	FName HolsterSocketName;
+
+	// Fähigkeiten, die dieses Item gewährt (z.B. Angriff, Blocken)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
+	TArray<TSubclassOf<class UGameplayAbility>> GrantedAbilities;
+
+	// Ist dies ein aktives Item (Waffe/Tool) oder passiv (Rüstung)?
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
+	bool bIsActiveItem = false;
 };

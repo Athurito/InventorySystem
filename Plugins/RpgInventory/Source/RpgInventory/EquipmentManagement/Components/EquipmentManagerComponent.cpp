@@ -4,6 +4,7 @@
 #include "EquipmentManagerComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "ActiveItemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
@@ -36,6 +37,8 @@ void UEquipmentManagerComponent::BeginPlay()
 	{
 		InventoryManager = GetOwner()->FindComponentByClass<UInventoryManagerComponent>();
 	}
+
+	ActiveItemComponent = GetOwner()->FindComponentByClass<UActiveItemComponent>();
 
 	if (InventoryManager)
 	{
@@ -135,8 +138,9 @@ void UEquipmentManagerComponent::OnItemEquipped(int32 SlotIndex, UInventoryItemI
 			USkeletalMeshComponent* NewPart = NewObject<USkeletalMeshComponent>(GetOwner());
 			NewPart->SetSkeletalMesh(EquipFrag->SkeletalMesh.LoadSynchronous());
 			NewPart->RegisterComponent();
-			NewPart->AttachToComponent(MainMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, EquipFrag->SocketName);
+			
 			ActiveSlot.SpawnedComponent = NewPart;
+			UpdateMeshSocket(SlotIndex, ItemInstance);
 		}
 	}
 
@@ -171,4 +175,44 @@ void UEquipmentManagerComponent::OnItemUnequipped(int32 SlotIndex, UInventoryIte
 
 	ActiveSlots.Remove(SlotIndex);
 	UE_LOG(LogTemp, Log, TEXT("Unequipped item from slot %d"), SlotIndex);
+}
+
+void UEquipmentManagerComponent::UpdateMeshSocket(int32 SlotIndex, UInventoryItemInstance* ItemInstance)
+{
+	if (!ItemInstance) return;
+	FActiveEquipmentSlot* ActiveSlot = ActiveSlots.Find(SlotIndex);
+	if (!ActiveSlot || !ActiveSlot->SpawnedComponent) return;
+
+	const UInventoryFragment_Equippable* EquipFrag = ItemInstance->FindFragmentByClass<UInventoryFragment_Equippable>();
+	if (!EquipFrag) return;
+
+	USkeletalMeshComponent* MainMesh = Cast<USkeletalMeshComponent>(GetOwner()->GetComponentByClass(USkeletalMeshComponent::StaticClass()));
+	if (!MainMesh) return;
+
+	bool bSlotIsActive = false;
+	if (ActiveItemComponent)
+	{
+		bSlotIsActive = (ActiveItemComponent->GetActiveSlotIndex() == SlotIndex);
+	}
+
+	FName TargetSocket = bSlotIsActive ? EquipFrag->SocketName : EquipFrag->HolsterSocketName;
+	
+	// Fallback falls kein Holster Socket definiert ist
+	if (TargetSocket.IsNone())
+	{
+		TargetSocket = EquipFrag->SocketName;
+	}
+
+	ActiveSlot->SpawnedComponent->AttachToComponent(MainMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, TargetSocket);
+}
+
+void UEquipmentManagerComponent::NotifyActiveSlotChanged(int32 NewActiveSlotIndex)
+{
+	// Alle Slots refreshen, um Meshes zwischen Hand und Holster zu verschieben
+	for (auto& It : ActiveSlots)
+	{
+		int32 SlotIdx = It.Key;
+		UInventoryItemInstance* Item = CurrentEquipment.IsValidIndex(SlotIdx) ? CurrentEquipment[SlotIdx] : nullptr;
+		UpdateMeshSocket(SlotIdx, Item);
+	}
 }

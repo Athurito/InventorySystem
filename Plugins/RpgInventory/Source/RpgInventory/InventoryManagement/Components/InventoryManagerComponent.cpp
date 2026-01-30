@@ -9,6 +9,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystemInterface.h"
+#include "RpgInventory/EquipmentManagement/Components/ActiveItemComponent.h"
 #include "RpgInventory/InventoryManagement/GameplayTags/InventoryOperationTags.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Stackable.h"
@@ -734,19 +735,61 @@ void UInventoryManagerComponent::UseItem(int32 ContainerIndex, int32 SlotIndex)
 		return;
 	}
 
-	// 2) Equippable-Logik (Auto-Equip)
+	// 2) Equippable-Logik (Auto-Equip oder Aktivieren)
 	if (const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>())
 	{
 		int32 EquipContainerIdx = GetFirstContainerIndexByType(EInventorySlotType::Equipment);
 		if (EquipContainerIdx != INDEX_NONE)
 		{
+			// Check if already in equipment
+			bool bIsEquipped = (ContainerIndex == EquipContainerIdx);
+			int32 FoundSlot = bIsEquipped ? SlotIndex : INDEX_NONE;
+			
+			if (!bIsEquipped)
+			{
+				// Suchen ob es in einem anderen Slot des Equipment-Containers ist
+				TArray<UInventoryItemInstance*> AllEquip = GetAllItems(EquipContainerIdx);
+				// Wir müssen den SlotIndex finden... das ist in der aktuellen API etwas umständlich
+				// Aber wir können einfach schauen ob die Instanz in der Liste ist.
+				
+				// Da wir die Slot-Validierung haben, suchen wir den ersten passenden Slot
+				for (int32 i = 0; i < GetNumSlots(EquipContainerIdx); ++i)
+				{
+					if (GetItemInstanceInSlot(i, EquipContainerIdx) == Item)
+					{
+						bIsEquipped = true;
+						FoundSlot = i;
+						break;
+					}
+				}
+			}
+
+			if (bIsEquipped)
+			{
+				// Wenn es bereits ausgerüstet ist UND ein aktives Item ist -> Aktiviere es!
+				if (EquipFrag->bIsActiveItem)
+				{
+					if (UActiveItemComponent* ActiveComp = GetOwner()->FindComponentByClass<UActiveItemComponent>())
+					{
+						ActiveComp->SetActiveSlot(FoundSlot);
+					}
+					else if (APawn* P = Cast<APawn>(GetOwner()))
+					{
+						if (UActiveItemComponent* PawnActiveComp = P->FindComponentByClass<UActiveItemComponent>())
+						{
+							PawnActiveComp->SetActiveSlot(FoundSlot);
+						}
+					}
+				}
+				return;
+			}
+
+			// Nicht ausgerüstet -> Auto-Equip
 			int32 NumEquipSlots = GetNumSlots(EquipContainerIdx);
 			for (int32 i = 0; i < NumEquipSlots; ++i)
 			{
-				// Prüfen ob der Slot das Item akzeptiert (via Tags/Query)
 				if (CanPlaceInContainer(Item, EquipContainerIdx, i))
 				{
-					// Verschieben (nutzt interne Logik für Swap oder Move)
 					HandleDrop_Internal(this, ContainerIndex, SlotIndex, EquipContainerIdx, i, 0, FGameplayTag::EmptyTag);
 					return;
 				}
