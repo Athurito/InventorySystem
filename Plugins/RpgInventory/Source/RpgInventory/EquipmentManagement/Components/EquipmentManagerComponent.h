@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "GameplayEffectTypes.h"
 #include "RpgInventory/InventoryManagement/Container/InventoryContainerDefinition.h"
+#include "RpgInventory/InventoryManagement/GAS/InventoryAbilitySet.h"
 #include "EquipmentManagerComponent.generated.h"
 
 class UInventoryManagerComponent;
@@ -21,6 +22,10 @@ struct FActiveEquipmentSlot
 
 	UPROPERTY()
 	TObjectPtr<USceneComponent> SpawnedComponent;
+
+	/** Handles for Lyra-style ability sets applied while equipped. */
+	UPROPERTY(Transient)
+	FInventoryAbilitySetHandles EquipAbilitySetHandles;
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))

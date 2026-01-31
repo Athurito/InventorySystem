@@ -5,11 +5,14 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayAbilitySpecHandle.h"
+#include "RpgInventory/InventoryManagement/GAS/InventoryAbilitySet.h"
 #include "ActiveItemComponent.generated.h"
 
 class UInventoryManagerComponent;
 class UInventoryItemInstance;
 class UEquipmentManagerComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnActiveEquipmentSlotChanged, int32, NewActiveSlotIndex, int32, OldActiveSlotIndex);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGINVENTORY_API UActiveItemComponent : public UActorComponent
@@ -18,6 +21,10 @@ class RPGINVENTORY_API UActiveItemComponent : public UActorComponent
 
 public:
 	UActiveItemComponent();
+
+	/** Fired on server when active slot changes and on clients via OnRep. */
+	UPROPERTY(BlueprintAssignable, Category="ActiveItem")
+	FOnActiveEquipmentSlotChanged OnActiveEquipmentSlotChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "ActiveItem")
 	void SetActiveSlot(int32 EquipmentSlotIndex);
@@ -42,9 +49,14 @@ private:
 	void OnRep_ActiveSlotIndex(int32 OldIndex);
 
 	void UpdateActiveVisuals();
-	void GrantAbilities(UInventoryItemInstance* Item);
-	void RemoveAbilities();
+	void BroadcastActiveSlotChanged(int32 OldIndex);
+	void ApplyActiveGrants(UInventoryItemInstance* Item);
+	void RemoveActiveGrants();
 
-	UPROPERTY()
-	TArray<FGameplayAbilitySpecHandle> GrantedAbilityHandles;
+	UPROPERTY(Transient)
+	FInventoryAbilitySetHandles ActiveAbilitySetHandles;
+
+	// Legacy direct ability grants (kept for backwards compatibility)
+	UPROPERTY(Transient)
+	TArray<FGameplayAbilitySpecHandle> LegacyGrantedAbilityHandles;
 };

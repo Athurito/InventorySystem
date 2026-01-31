@@ -11,6 +11,7 @@
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
+#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_WeaponConfig.h"
 
 UActiveItemComponent::UActiveItemComponent()
 {
@@ -45,6 +46,8 @@ void UActiveItemComponent::SetActiveSlot(int32 EquipmentSlotIndex)
 		return;
 	}
 
+	const int32 OldIndex = ActiveSlotIndex;
+
 	if (ActiveSlotIndex == EquipmentSlotIndex)
 	{
 		// Toggle off if same slot is pressed?
@@ -55,22 +58,25 @@ void UActiveItemComponent::SetActiveSlot(int32 EquipmentSlotIndex)
 		ActiveSlotIndex = EquipmentSlotIndex;
 	}
 
+	BroadcastActiveSlotChanged(OldIndex);
+
 	UpdateActiveVisuals();
 	
-	// Update abilities
-	RemoveAbilities();
+	// Update abilities/effects granted while active
+	RemoveActiveGrants();
 	if (ActiveSlotIndex != INDEX_NONE && InventoryManager)
 	{
 		int32 EquipContainer = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Equipment);
 		if (UInventoryItemInstance* Item = InventoryManager->GetItemInstanceInSlot(ActiveSlotIndex, EquipContainer))
 		{
-			GrantAbilities(Item);
+			ApplyActiveGrants(Item);
 		}
 	}
 }
 
 void UActiveItemComponent::OnRep_ActiveSlotIndex(int32 OldIndex)
 {
+	BroadcastActiveSlotChanged(OldIndex);
 	UpdateActiveVisuals();
 }
 
@@ -82,7 +88,12 @@ void UActiveItemComponent::UpdateActiveVisuals()
     }
 }
 
-void UActiveItemComponent::GrantAbilities(UInventoryItemInstance* Item)
+void UActiveItemComponent::BroadcastActiveSlotChanged(int32 OldIndex)
+{
+	OnActiveEquipmentSlotChanged.Broadcast(ActiveSlotIndex, OldIndex);
+}
+
+void UActiveItemComponent::ApplyActiveGrants(UInventoryItemInstance* Item)
 {
 	if (!Item) return;
 	const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>();
@@ -105,16 +116,29 @@ void UActiveItemComponent::GrantAbilities(UInventoryItemInstance* Item)
 		return;
 	}
 
+	// 1) Apply active ability sets (preferred)
+	if (const UInventoryFragment_WeaponConfig* WeaponFrag = Item->FindFragmentByClass<UInventoryFragment_WeaponConfig>())
+	{
+		for (const UInventoryAbilitySet* Set : WeaponFrag->ActiveAbilitySets)
+		{
+			if (Set)
+			{
+				Set->ApplyToASC(ASC, Item, ActiveAbilitySetHandles);
+			}
+		}
+	}
+
+	// 2) Legacy direct grants (optional)
 	for (auto AbilityClass : EquipFrag->GrantedAbilities)
 	{
 		if (AbilityClass)
 		{
-			GrantedAbilityHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1)));
+			LegacyGrantedAbilityHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1)));
 		}
 	}
 }
 
-void UActiveItemComponent::RemoveAbilities()
+void UActiveItemComponent::RemoveActiveGrants()
 {
 	UAbilitySystemComponent* ASC = nullptr;
 	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
@@ -129,7 +153,9 @@ void UActiveItemComponent::RemoveAbilities()
 	}
 	if (ASC)
 	{
-		for (auto& Handle : GrantedAbilityHandles)
+		UInventoryAbilitySet::RemoveFromASC(ASC, ActiveAbilitySetHandles);
+
+		for (auto& Handle : LegacyGrantedAbilityHandles)
 		{
 			if (Handle.IsValid())
 			{
@@ -137,7 +163,7 @@ void UActiveItemComponent::RemoveAbilities()
 			}
 		}
 	}
-	GrantedAbilityHandles.Empty();
+	LegacyGrantedAbilityHandles.Empty();
 }
 
 void UActiveItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

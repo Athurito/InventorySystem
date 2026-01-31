@@ -12,6 +12,33 @@
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
 
+static UAbilitySystemComponent* GetPlayerStateASCFromActorOwner(AActor* Owner)
+{
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	const APawn* Pawn = Cast<APawn>(Owner);
+	if (!Pawn)
+	{
+		return nullptr;
+	}
+
+	APlayerState* PS = Pawn->GetPlayerState();
+	if (!PS)
+	{
+		return nullptr;
+	}
+
+	if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
+	{
+		return ASI->GetAbilitySystemComponent();
+	}
+
+	return nullptr;
+}
+
 UEquipmentManagerComponent::UEquipmentManagerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -107,18 +134,8 @@ void UEquipmentManagerComponent::OnItemEquipped(int32 SlotIndex, UInventoryItemI
 
 	FActiveEquipmentSlot& ActiveSlot = ActiveSlots.FindOrAdd(SlotIndex);
 
-	// 1) Gameplay Effects anwenden (ASC lives on PlayerState)
-	UAbilitySystemComponent* ASC = nullptr;
-	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
-	{
-		if (APlayerState* PS = Pawn->GetPlayerState())
-		{
-			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
-			{
-				ASC = ASI->GetAbilitySystemComponent();
-			}
-		}
-	}
+	// 1) Gameplay Effects / AbilitySets anwenden (ASC lives on PlayerState)
+	UAbilitySystemComponent* ASC = GetPlayerStateASCFromActorOwner(GetOwner());
 	if (ASC)
 	{
 			for (auto& EffectClass : EquipFrag->GameplayEffects)
@@ -133,6 +150,15 @@ void UEquipmentManagerComponent::OnItemEquipped(int32 SlotIndex, UInventoryItemI
 						FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 						ActiveSlot.AppliedEffects.Add(Handle);
 					}
+				}
+			}
+
+			// Apply equip ability sets (Lyra-style light)
+			for (const UInventoryAbilitySet* Set : EquipFrag->EquipAbilitySets)
+			{
+				if (Set)
+				{
+					Set->ApplyToASC(ASC, ItemInstance, ActiveSlot.EquipAbilitySetHandles);
 				}
 			}
 	}
@@ -162,18 +188,8 @@ void UEquipmentManagerComponent::OnItemUnequipped(int32 SlotIndex, UInventoryIte
 	if (!ActiveSlot) return;
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
-	// 1) Effekte entfernen (ASC lives on PlayerState)
-	UAbilitySystemComponent* ASC = nullptr;
-	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
-	{
-		if (APlayerState* PS = Pawn->GetPlayerState())
-		{
-			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
-			{
-				ASC = ASI->GetAbilitySystemComponent();
-			}
-		}
-	}
+	// 1) Effekte/AbilitySets entfernen (ASC lives on PlayerState)
+	UAbilitySystemComponent* ASC = GetPlayerStateASCFromActorOwner(GetOwner());
 	if (ASC)
 	{
 			for (auto& Handle : ActiveSlot->AppliedEffects)
@@ -183,6 +199,8 @@ void UEquipmentManagerComponent::OnItemUnequipped(int32 SlotIndex, UInventoryIte
 					ASC->RemoveActiveGameplayEffect(Handle);
 				}
 			}
+
+			UInventoryAbilitySet::RemoveFromASC(ASC, ActiveSlot->EquipAbilitySetHandles);
 	}
 
 	// 2) Komponente zerstören

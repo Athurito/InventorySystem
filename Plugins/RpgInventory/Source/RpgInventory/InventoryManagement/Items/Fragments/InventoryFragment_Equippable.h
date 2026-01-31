@@ -9,6 +9,7 @@
 
 class UGameplayEffect;
 class USkeletalMesh;
+class UInventoryAbilitySet;
 
 /**
  * Fragment für ausrüstbare Items (Waffen, Rüstung etc.)
@@ -42,6 +43,13 @@ public:
 	// Fähigkeiten, die dieses Item gewährt (z.B. Angriff, Blocken)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
 	TArray<TSubclassOf<class UGameplayAbility>> GrantedAbilities;
+
+	/**
+	 * Lyra-style AbilitySets applied while the item is equipped (passive equip).
+	 * These are applied/removed by the equipment system on the server.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
+	TArray<TObjectPtr<UInventoryAbilitySet>> EquipAbilitySets;
 
 	// Ist dies ein aktives Item (Waffe/Tool) oder passiv (Rüstung)?
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
