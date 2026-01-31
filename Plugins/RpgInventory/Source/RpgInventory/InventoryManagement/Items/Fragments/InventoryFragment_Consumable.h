@@ -63,7 +63,9 @@ class UInventoryFragment_Consumable : public UInventoryItemFragment
 	
 public:
 
+	UFUNCTION(BlueprintCallable, Category = "Consumable")
 	bool ShouldReduceStack() const { return bReduceStack; }
+	UFUNCTION(BlueprintCallable, Category = "Consumable")
 	int32 GetQuantityPerUse() const { return QuantityPerUse; }
 	FGameplayTag GetUseEventTag() const { return UseEventTag; }
 };

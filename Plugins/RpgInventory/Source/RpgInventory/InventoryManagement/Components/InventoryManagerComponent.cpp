@@ -5,6 +5,7 @@
 #include "Engine/ActorChannel.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
@@ -16,6 +17,8 @@
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Consumable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/Rpg_FragmentTags.h"
+#include "RpgInventory/InventoryManagement/GameplayTags/InventoryEventTags.h"
+#include "RpgInventory/InventoryManagement/GAS/InventoryUseItemPayload.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemDefinition.h"
 
 UInventoryManagerComponent::UInventoryManagerComponent()
@@ -688,114 +691,117 @@ void UInventoryManagerComponent::UseItem(int32 ContainerIndex, int32 SlotIndex)
 	UInventoryItemInstance* Item = GetItemInstanceInSlot(SlotIndex, ContainerIndex);
 	if (!Item) return;
 
-	// 1) Consumable-Logik
+	// ASC lives on PlayerState (this component is intended to be on PlayerState)
+	IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner());
+	if (!ASI)
+	{
+		return;
+	}
+	UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	APlayerState* OwningPS = Cast<APlayerState>(GetOwner());
+	APawn* UsePawn = OwningPS ? OwningPS->GetPawn() : nullptr;
+	AActor* InstigatorActor = UsePawn ? Cast<AActor>(UsePawn) : GetOwner();
+
+	UInventoryUseItemPayload* PayloadObject = NewObject<UInventoryUseItemPayload>(this);
+	PayloadObject->InventoryManager = this;
+	PayloadObject->ItemInstance = Item;
+	PayloadObject->ContainerIndex = ContainerIndex;
+	PayloadObject->SlotIndex = SlotIndex;
+	PayloadObject->UseContext = (ContainerIndex == GetFirstContainerIndexByType(EInventorySlotType::Hotbar))
+		? EUseContext::Hotbar
+		: EUseContext::Inventory;
+
+	// 1) Consumable-Dispatch (Ability-first: BP ability handles effects + stack reduction)
 	if (const UInventoryFragment_Consumable* ConsumableFrag = Item->FindFragmentByClass<UInventoryFragment_Consumable>())
 	{
-		// Sende Gameplay Event an den Owner (Character/Pawn)
-		if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+		FGameplayTag EventTag = ConsumableFrag->GetUseEventTag();
+		if (EventTag.IsValid())
 		{
-			if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
-			{
-				FGameplayTag EventTag = ConsumableFrag->GetUseEventTag();
-				if (EventTag.IsValid())
-				{
-					FGameplayEventData Payload;
-					Payload.Instigator = GetOwner();
-					Payload.OptionalObject = Item;
-					ASC->HandleGameplayEvent(EventTag, &Payload);
-				}
-			}
-		}
-
-		// Stack reduzieren falls nötig
-		if (ConsumableFrag->ShouldReduceStack())
-		{
-			int32 CurrentCount = Item->GetStatTagStackCount(FragmentTags::StackableFragment);
-			int32 NewCount = CurrentCount - ConsumableFrag->GetQuantityPerUse();
-			
-			if (NewCount <= 0)
-			{
-				InventoryList.RemoveEntry(Item);
-			}
-			else
-			{
-				Item->SetStatTagStackCount(FragmentTags::StackableFragment, NewCount);
-				// Mark Dirty für Replikation
-				for (FInventoryEntry& Entry : InventoryList.Entries)
-				{
-					if (Entry.Instance == Item)
-					{
-						InventoryList.MarkItemDirty(Entry);
-						break;
-					}
-				}
-			}
-			BroadcastSlotChanged(ContainerIndex, SlotIndex);
+			FGameplayEventData Payload;
+			Payload.Instigator = InstigatorActor;
+			Payload.Target = InstigatorActor;
+			Payload.OptionalObject = PayloadObject;
+			Payload.OptionalObject2 = Item;
+			ASC->HandleGameplayEvent(EventTag, &Payload);
 		}
 		return;
 	}
 
-	// 2) Equippable-Logik (Auto-Equip oder Aktivieren)
-	if (const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>())
+	// 2) Equippable-Dispatch (Ability decides: equip/activate)
+	if (Item->FindFragmentByClass<UInventoryFragment_Equippable>())
 	{
-		int32 EquipContainerIdx = GetFirstContainerIndexByType(EInventorySlotType::Equipment);
-		if (EquipContainerIdx != INDEX_NONE)
+		FGameplayEventData Payload;
+		Payload.Instigator = InstigatorActor;
+		Payload.Target = InstigatorActor;
+		Payload.OptionalObject = PayloadObject;
+		Payload.OptionalObject2 = Item;
+		ASC->HandleGameplayEvent(RpgTags::InventoryEvent_UseEquippable, &Payload);
+		return;
+	}
+
+	// 3) Fallback: generic use
+	{
+		FGameplayEventData Payload;
+		Payload.Instigator = InstigatorActor;
+		Payload.Target = InstigatorActor;
+		Payload.OptionalObject = PayloadObject;
+		Payload.OptionalObject2 = Item;
+		ASC->HandleGameplayEvent(RpgTags::InventoryEvent_UseItem, &Payload);
+	}
+}
+
+bool UInventoryManagerComponent::ConsumeStackInSlot(int32 ContainerIndex, int32 SlotIndex, int32 Quantity)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (Quantity <= 0) return false;
+
+	UInventoryItemInstance* Item = GetItemInstanceInSlot(SlotIndex, ContainerIndex);
+	if (!Item) return false;
+
+	const int32 CurrentCount = Item->GetStatTagStackCount(FragmentTags::StackableFragment);
+	if (CurrentCount <= 0)
+	{
+		// We expect consumables to be stackable. If the item has no stack count, do not consume.
+		return false;
+	}
+	if (CurrentCount < Quantity)
+	{
+		// Not enough in the stack to pay the cost
+		return false;
+	}
+
+	const int32 NewCount = CurrentCount - Quantity;
+	if (NewCount == 0)
+	{
+		InventoryList.RemoveEntry(Item);
+		BroadcastSlotChanged(ContainerIndex, SlotIndex);
+		return true;
+	}
+
+	Item->SetStatTagStackCount(FragmentTags::StackableFragment, NewCount);
+	for (FInventoryEntry& Entry : InventoryList.Entries)
+	{
+		if (Entry.Instance == Item)
 		{
-			// Check if already in equipment
-			bool bIsEquipped = (ContainerIndex == EquipContainerIdx);
-			int32 FoundSlot = bIsEquipped ? SlotIndex : INDEX_NONE;
-			
-			if (!bIsEquipped)
-			{
-				// Suchen ob es in einem anderen Slot des Equipment-Containers ist
-				TArray<UInventoryItemInstance*> AllEquip = GetAllItems(EquipContainerIdx);
-				// Wir müssen den SlotIndex finden... das ist in der aktuellen API etwas umständlich
-				// Aber wir können einfach schauen ob die Instanz in der Liste ist.
-				
-				// Da wir die Slot-Validierung haben, suchen wir den ersten passenden Slot
-				for (int32 i = 0; i < GetNumSlots(EquipContainerIdx); ++i)
-				{
-					if (GetItemInstanceInSlot(i, EquipContainerIdx) == Item)
-					{
-						bIsEquipped = true;
-						FoundSlot = i;
-						break;
-					}
-				}
-			}
-
-			if (bIsEquipped)
-			{
-				// Wenn es bereits ausgerüstet ist UND ein aktives Item ist -> Aktiviere es!
-				if (EquipFrag->bIsActiveItem)
-				{
-					if (UActiveItemComponent* ActiveComp = GetOwner()->FindComponentByClass<UActiveItemComponent>())
-					{
-						ActiveComp->SetActiveSlot(FoundSlot);
-					}
-					else if (APawn* P = Cast<APawn>(GetOwner()))
-					{
-						if (UActiveItemComponent* PawnActiveComp = P->FindComponentByClass<UActiveItemComponent>())
-						{
-							PawnActiveComp->SetActiveSlot(FoundSlot);
-						}
-					}
-				}
-				return;
-			}
-
-			// Nicht ausgerüstet -> Auto-Equip
-			int32 NumEquipSlots = GetNumSlots(EquipContainerIdx);
-			for (int32 i = 0; i < NumEquipSlots; ++i)
-			{
-				if (CanPlaceInContainer(Item, EquipContainerIdx, i))
-				{
-					HandleDrop_Internal(this, ContainerIndex, SlotIndex, EquipContainerIdx, i, 0, FGameplayTag::EmptyTag);
-					return;
-				}
-			}
+			InventoryList.MarkItemDirty(Entry);
+			break;
 		}
 	}
+	BroadcastSlotChanged(ContainerIndex, SlotIndex);
+	return true;
+}
+
+bool UInventoryManagerComponent::MoveOrOperateItem(int32 SourceContainerIndex, int32 SourceSlotIndex,
+	int32 TargetContainerIndex, int32 TargetSlotIndex, int32 DragQuantity, FGameplayTag OperationType)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	HandleDrop_Internal(this, SourceContainerIndex, SourceSlotIndex, TargetContainerIndex, TargetSlotIndex, DragQuantity, OperationType);
+	return true;
 }
 
 int32 UInventoryManagerComponent::GetFirstContainerIndexByType(EInventorySlotType Type) const

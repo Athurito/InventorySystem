@@ -88,33 +88,52 @@ void UActiveItemComponent::GrantAbilities(UInventoryItemInstance* Item)
 	const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>();
 	if (!EquipFrag) return;
 
-	if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+	// ASC lives on PlayerState (Lyra-style)
+	UAbilitySystemComponent* ASC = nullptr;
+	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
-		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+		if (APlayerState* PS = Pawn->GetPlayerState())
 		{
-			for (auto AbilityClass : EquipFrag->GrantedAbilities)
+			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
 			{
-				if (AbilityClass)
-				{
-					GrantedAbilityHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1)));
-				}
+				ASC = ASI->GetAbilitySystemComponent();
 			}
+		}
+	}
+	if (!ASC)
+	{
+		return;
+	}
+
+	for (auto AbilityClass : EquipFrag->GrantedAbilities)
+	{
+		if (AbilityClass)
+		{
+			GrantedAbilityHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1)));
 		}
 	}
 }
 
 void UActiveItemComponent::RemoveAbilities()
 {
-	if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+	UAbilitySystemComponent* ASC = nullptr;
+	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
-		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+		if (APlayerState* PS = Pawn->GetPlayerState())
 		{
-			for (auto& Handle : GrantedAbilityHandles)
+			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
 			{
-				if (Handle.IsValid())
-				{
-					ASC->ClearAbility(Handle);
-				}
+				ASC = ASI->GetAbilitySystemComponent();
+			}
+		}
+	}
+	if (ASC)
+	{
+		for (auto& Handle : GrantedAbilityHandles)
+		{
+			if (Handle.IsValid())
+			{
+				ASC->ClearAbility(Handle);
 			}
 		}
 	}

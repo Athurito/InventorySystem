@@ -100,17 +100,27 @@ void UEquipmentManagerComponent::RefreshSlot(int32 SlotIndex)
 void UEquipmentManagerComponent::OnItemEquipped(int32 SlotIndex, UInventoryItemInstance* ItemInstance)
 {
 	if (!ItemInstance) return;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
 	const UInventoryFragment_Equippable* EquipFrag = ItemInstance->FindFragmentByClass<UInventoryFragment_Equippable>();
 	if (!EquipFrag) return;
 
 	FActiveEquipmentSlot& ActiveSlot = ActiveSlots.FindOrAdd(SlotIndex);
 
-	// 1) Gameplay Effects anwenden
-	if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+	// 1) Gameplay Effects anwenden (ASC lives on PlayerState)
+	UAbilitySystemComponent* ASC = nullptr;
+	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
-		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+		if (APlayerState* PS = Pawn->GetPlayerState())
 		{
+			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
+			{
+				ASC = ASI->GetAbilitySystemComponent();
+			}
+		}
+	}
+	if (ASC)
+	{
 			for (auto& EffectClass : EquipFrag->GameplayEffects)
 			{
 				if (EffectClass)
@@ -125,7 +135,6 @@ void UEquipmentManagerComponent::OnItemEquipped(int32 SlotIndex, UInventoryItemI
 					}
 				}
 			}
-		}
 	}
 
 	// 2) Mesh attachen
@@ -151,12 +160,22 @@ void UEquipmentManagerComponent::OnItemUnequipped(int32 SlotIndex, UInventoryIte
 {
 	FActiveEquipmentSlot* ActiveSlot = ActiveSlots.Find(SlotIndex);
 	if (!ActiveSlot) return;
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
-	// 1) Effekte entfernen
-	if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(GetOwner()))
+	// 1) Effekte entfernen (ASC lives on PlayerState)
+	UAbilitySystemComponent* ASC = nullptr;
+	if (const APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
-		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+		if (APlayerState* PS = Pawn->GetPlayerState())
 		{
+			if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(PS))
+			{
+				ASC = ASI->GetAbilitySystemComponent();
+			}
+		}
+	}
+	if (ASC)
+	{
 			for (auto& Handle : ActiveSlot->AppliedEffects)
 			{
 				if (Handle.IsValid())
@@ -164,7 +183,6 @@ void UEquipmentManagerComponent::OnItemUnequipped(int32 SlotIndex, UInventoryIte
 					ASC->RemoveActiveGameplayEffect(Handle);
 				}
 			}
-		}
 	}
 
 	// 2) Komponente zerstören

@@ -10,6 +10,7 @@
 UHotbarComponent::UHotbarComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UHotbarComponent::BeginPlay()
@@ -40,8 +41,18 @@ void UHotbarComponent::BeginPlay()
 void UHotbarComponent::UseHotbarSlot(int32 SlotIndex)
 {
 	if (!InventoryManager || HotbarContainerIndex == INDEX_NONE) return;
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		ServerUseHotbarSlot(SlotIndex);
+		return;
+	}
 
 	InventoryManager->UseItem(HotbarContainerIndex, SlotIndex);
 	UE_LOG(LogTemp, Log, TEXT("Using item from Hotbar slot %d"), SlotIndex);
+}
+
+void UHotbarComponent::ServerUseHotbarSlot_Implementation(int32 SlotIndex)
+{
+	UseHotbarSlot(SlotIndex);
 }
 

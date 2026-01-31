@@ -73,6 +73,20 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
 	void UseItem(int32 ContainerIndex, int32 SlotIndex);
 
+	/** Authority-only helper for GAS abilities: reduce stack and remove instance if stack reaches 0. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	bool ConsumeStackInSlot(int32 ContainerIndex, int32 SlotIndex, int32 Quantity);
+
+	/** Authority-only helper for GAS abilities: move/swap/merge via the existing drop logic. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Inventory")
+	bool MoveOrOperateItem(
+		int32 SourceContainerIndex,
+		int32 SourceSlotIndex,
+		int32 TargetContainerIndex,
+		int32 TargetSlotIndex,
+		int32 DragQuantity,
+		FGameplayTag OperationType);
+
 	UPROPERTY(BlueprintAssignable)
 	FOnInventorySlotChanged OnInventorySlotChanged;
 	

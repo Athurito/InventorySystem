@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hotbar")
 	void UseHotbarSlot(int32 SlotIndex);
 
+	UFUNCTION(Server, Reliable)
+	void ServerUseHotbarSlot(int32 SlotIndex);
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryManagerComponent> InventoryManager;
