@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "WeaponManagerComponent.generated.h"
 
+class AActor;
+class USkeletalMeshComponent;
 class UInventoryManagerComponent;
 class UInventoryItemInstance;
 class UActiveItemComponent;
@@ -33,6 +35,11 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	void TryInitialize();
+	void ScheduleInitRetry();
+	void ClearInitRetry();
 
 	UFUNCTION()
 	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
@@ -56,6 +63,9 @@ private:
 	TObjectPtr<UActiveItemComponent> ActiveItemComponent;
 
 	int32 HotbarContainerIndex = INDEX_NONE;
+
+	bool bInitialized = false;
+	FTimerHandle InitRetryHandle;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInventoryItemInstance>> CurrentHotbar;

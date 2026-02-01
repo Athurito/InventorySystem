@@ -38,6 +38,12 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	/** Resolves InventoryManager/Equipment container and binds events once PlayerState is ready (clients). */
+	void TryInitialize();
+	void ScheduleInitRetry();
+	void ClearInitRetry();
 
 	UFUNCTION()
 	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
@@ -61,6 +67,9 @@ private:
 	class UActiveItemComponent* ActiveItemComponent;
 
 	int32 EquipmentContainerIndex = INDEX_NONE;
+
+	bool bInitialized = false;
+	FTimerHandle InitRetryHandle;
 
 	// Speichert die aktuell ausgerüsteten Instanzen für den Vergleich
 	UPROPERTY(Transient)

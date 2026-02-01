@@ -2,6 +2,7 @@
 
 #include "InventoryManagerComponent.h"
 
+#include "EngineUtils.h"
 #include "Engine/ActorChannel.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
@@ -54,8 +55,11 @@ void UInventoryManagerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 void UInventoryManagerComponent::BroadcastSlotChanged(int32 ContainerIndex, int32 SlotIndex) const
 {
 	const bool bAuth = GetOwner() && GetOwner()->HasAuthority();
-	UE_LOG(LogTemp, Warning, TEXT("SlotChanged C=%d S=%d  Auth=%d"),
-		ContainerIndex, SlotIndex, bAuth ? 1 : 0);
+	UE_LOG(LogTemp, Warning, TEXT("[InvSlotChanged] Owner=%s C=%d S=%d Auth=%d"),
+		*GetNameSafe(GetOwner()),
+		ContainerIndex,
+		SlotIndex,
+		bAuth ? 1 : 0);
 
     OnInventorySlotChanged.Broadcast(ContainerIndex, SlotIndex);
 }

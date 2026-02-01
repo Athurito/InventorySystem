@@ -9,6 +9,9 @@
 #include "InventoryManagerComponent.generated.h"
 
 struct FInvSlotArray;
+class APawn;
+class UInventoryItemInstance;
+class UInventoryItemDefinition;
 
 UENUM(BlueprintType)
 enum EInventoryClickAction : uint8

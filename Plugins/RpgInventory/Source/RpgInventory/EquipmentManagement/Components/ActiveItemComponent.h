@@ -12,7 +12,7 @@ class UInventoryItemInstance;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnActiveHotbarSlotChanged, int32, NewActiveHotbarSlotIndex, int32, OldActiveHotbarSlotIndex);
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent, DisplayName = "Active Item Component"))
 class RPGINVENTORY_API UActiveItemComponent : public UActorComponent
 {
 	GENERATED_BODY()

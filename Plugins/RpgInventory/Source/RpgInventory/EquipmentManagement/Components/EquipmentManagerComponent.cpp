@@ -8,6 +8,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
+#include "TimerManager.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
@@ -50,38 +51,110 @@ void UEquipmentManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Falls die Komponente am Character hängt, suchen wir den InventoryManager am PlayerState
-	if (APawn* OwningPawn = Cast<APawn>(GetOwner()))
+	ActiveItemComponent = GetOwner() ? GetOwner()->FindComponentByClass<UActiveItemComponent>() : nullptr;
+	TryInitialize();
+}
+
+void UEquipmentManagerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ClearInitRetry();
+
+	if (InventoryManager)
+	{
+		InventoryManager->OnInventorySlotChanged.RemoveDynamic(this, &UEquipmentManagerComponent::OnInventorySlotChanged);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void UEquipmentManagerComponent::TryInitialize()
+{
+	if (bInitialized)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		ScheduleInitRetry();
+		return;
+	}
+
+	// Inventory lives on PlayerState; on clients PlayerState can be null during BeginPlay.
+	InventoryManager = nullptr;
+	if (APawn* OwningPawn = Cast<APawn>(OwnerActor))
 	{
 		if (APlayerState* PS = OwningPawn->GetPlayerState())
 		{
 			InventoryManager = PS->FindComponentByClass<UInventoryManagerComponent>();
 		}
 	}
-	
-	// Fallback: Falls die Komponente direkt am PlayerState (oder dem gleichen Actor wie der Manager) hängt
+
+	// Fallback: if the component is attached to the same actor as the manager (e.g. PlayerState)
 	if (!InventoryManager)
 	{
-		InventoryManager = GetOwner()->FindComponentByClass<UInventoryManagerComponent>();
+		InventoryManager = OwnerActor->FindComponentByClass<UInventoryManagerComponent>();
 	}
 
-	ActiveItemComponent = GetOwner()->FindComponentByClass<UActiveItemComponent>();
-
-	if (InventoryManager)
+	if (!InventoryManager)
 	{
-		EquipmentContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Equipment);
-		if (EquipmentContainerIndex != INDEX_NONE)
-		{
-			InventoryManager->OnInventorySlotChanged.AddDynamic(this, &UEquipmentManagerComponent::OnInventorySlotChanged);
-			
-			// Initialen Stand laden
-			int32 NumSlots = InventoryManager->GetNumSlots(EquipmentContainerIndex);
-			CurrentEquipment.SetNum(NumSlots);
-			for (int32 i = 0; i < NumSlots; ++i)
-			{
-				RefreshSlot(i);
-			}
-		}
+		ScheduleInitRetry();
+		return;
+	}
+
+	EquipmentContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Equipment);
+	if (EquipmentContainerIndex == INDEX_NONE)
+	{
+		// Manager is valid but container defs might not be ready yet on client; retry shortly.
+		ScheduleInitRetry();
+		return;
+	}
+
+	InventoryManager->OnInventorySlotChanged.AddUniqueDynamic(this, &UEquipmentManagerComponent::OnInventorySlotChanged);
+
+	// Initial resync (clients + server)
+	const int32 NumSlots = InventoryManager->GetNumSlots(EquipmentContainerIndex);
+	CurrentEquipment.SetNum(NumSlots);
+	for (int32 i = 0; i < NumSlots; ++i)
+	{
+		RefreshSlot(i);
+	}
+
+	bInitialized = true;
+	ClearInitRetry();
+}
+
+void UEquipmentManagerComponent::ScheduleInitRetry()
+{
+	if (bInitialized)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (World->GetTimerManager().IsTimerActive(InitRetryHandle))
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		InitRetryHandle,
+		FTimerDelegate::CreateUObject(this, &UEquipmentManagerComponent::TryInitialize),
+		0.1f,
+		true);
+}
+
+void UEquipmentManagerComponent::ClearInitRetry()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(InitRetryHandle);
 	}
 }
 
