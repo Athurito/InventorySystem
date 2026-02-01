@@ -40,10 +40,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
 	FName HolsterSocketName;
 
-	// Fähigkeiten, die dieses Item gewährt (z.B. Angriff, Blocken)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
-	TArray<TSubclassOf<class UGameplayAbility>> GrantedAbilities;
-
 	/**
 	 * Lyra-style AbilitySets applied while the item is equipped (passive equip).
 	 * These are applied/removed by the equipment system on the server.

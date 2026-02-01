@@ -40,7 +40,7 @@ protected:
 	UFUNCTION()
 	void OnActiveSlotChanged(int32 NewActiveSlotIndex, int32 OldActiveSlotIndex);
 
-	void RefreshEquipmentSlot(int32 SlotIndex);
+	void RefreshHotbarSlot(int32 SlotIndex);
 	void UpdateAttachmentForSlot(int32 SlotIndex);
 
 	AActor* SpawnWeaponActorForItem(int32 SlotIndex, UInventoryItemInstance* Item);
@@ -55,10 +55,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UActiveItemComponent> ActiveItemComponent;
 
-	int32 EquipmentContainerIndex = INDEX_NONE;
+	int32 HotbarContainerIndex = INDEX_NONE;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UInventoryItemInstance>> CurrentEquipment;
+	TArray<TObjectPtr<UInventoryItemInstance>> CurrentHotbar;
 
 	UPROPERTY(Transient)
 	TMap<int32, FSpawnedWeaponSlot> SpawnedWeapons;

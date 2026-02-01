@@ -4,13 +4,11 @@
 #include "ActiveItemComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
-#include "EquipmentManagerComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
-#include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_Equippable.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_WeaponConfig.h"
 
 UActiveItemComponent::UActiveItemComponent()
@@ -36,68 +34,64 @@ void UActiveItemComponent::BeginPlay()
 		InventoryManager = GetOwner()->FindComponentByClass<UInventoryManagerComponent>();
 	}
 
-	EquipmentManager = GetOwner()->FindComponentByClass<UEquipmentManagerComponent>();
+	if (InventoryManager)
+	{
+		HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
+	}
 }
 
-void UActiveItemComponent::SetActiveSlot(int32 EquipmentSlotIndex)
+void UActiveItemComponent::SetActiveSlot(int32 HotbarSlotIndex)
 {
 	if (GetOwnerRole() < ROLE_Authority)
 	{
 		return;
 	}
 
-	const int32 OldIndex = ActiveSlotIndex;
+	const int32 OldIndex = ActiveHotbarSlotIndex;
 
-	if (ActiveSlotIndex == EquipmentSlotIndex)
+	if (ActiveHotbarSlotIndex == HotbarSlotIndex)
 	{
 		// Toggle off if same slot is pressed?
-		ActiveSlotIndex = INDEX_NONE;
+		ActiveHotbarSlotIndex = INDEX_NONE;
 	}
 	else
 	{
-		ActiveSlotIndex = EquipmentSlotIndex;
+		ActiveHotbarSlotIndex = HotbarSlotIndex;
 	}
 
 	BroadcastActiveSlotChanged(OldIndex);
-
-	UpdateActiveVisuals();
 	
 	// Update abilities/effects granted while active
 	RemoveActiveGrants();
-	if (ActiveSlotIndex != INDEX_NONE && InventoryManager)
+	if (ActiveHotbarSlotIndex != INDEX_NONE && InventoryManager)
 	{
-		int32 EquipContainer = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Equipment);
-		if (UInventoryItemInstance* Item = InventoryManager->GetItemInstanceInSlot(ActiveSlotIndex, EquipContainer))
+		if (HotbarContainerIndex == INDEX_NONE)
 		{
-			ApplyActiveGrants(Item);
+			HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
+		}
+		if (HotbarContainerIndex != INDEX_NONE)
+		{
+			if (UInventoryItemInstance* Item = InventoryManager->GetItemInstanceInSlot(ActiveHotbarSlotIndex, HotbarContainerIndex))
+			{
+				ApplyActiveGrants(Item);
+			}
 		}
 	}
 }
 
-void UActiveItemComponent::OnRep_ActiveSlotIndex(int32 OldIndex)
+void UActiveItemComponent::OnRep_ActiveHotbarSlotIndex(int32 OldIndex)
 {
 	BroadcastActiveSlotChanged(OldIndex);
-	UpdateActiveVisuals();
-}
-
-void UActiveItemComponent::UpdateActiveVisuals()
-{
-    if (EquipmentManager)
-    {
-        EquipmentManager->NotifyActiveSlotChanged(ActiveSlotIndex);
-    }
 }
 
 void UActiveItemComponent::BroadcastActiveSlotChanged(int32 OldIndex)
 {
-	OnActiveEquipmentSlotChanged.Broadcast(ActiveSlotIndex, OldIndex);
+	OnActiveHotbarSlotChanged.Broadcast(ActiveHotbarSlotIndex, OldIndex);
 }
 
 void UActiveItemComponent::ApplyActiveGrants(UInventoryItemInstance* Item)
 {
 	if (!Item) return;
-	const UInventoryFragment_Equippable* EquipFrag = Item->FindFragmentByClass<UInventoryFragment_Equippable>();
-	if (!EquipFrag) return;
 
 	// ASC lives on PlayerState (Lyra-style)
 	UAbilitySystemComponent* ASC = nullptr;
@@ -127,15 +121,6 @@ void UActiveItemComponent::ApplyActiveGrants(UInventoryItemInstance* Item)
 			}
 		}
 	}
-
-	// 2) Legacy direct grants (optional)
-	for (auto AbilityClass : EquipFrag->GrantedAbilities)
-	{
-		if (AbilityClass)
-		{
-			LegacyGrantedAbilityHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1)));
-		}
-	}
 }
 
 void UActiveItemComponent::RemoveActiveGrants()
@@ -154,20 +139,11 @@ void UActiveItemComponent::RemoveActiveGrants()
 	if (ASC)
 	{
 		UInventoryAbilitySet::RemoveFromASC(ASC, ActiveAbilitySetHandles);
-
-		for (auto& Handle : LegacyGrantedAbilityHandles)
-		{
-			if (Handle.IsValid())
-			{
-				ASC->ClearAbility(Handle);
-			}
-		}
 	}
-	LegacyGrantedAbilityHandles.Empty();
 }
 
 void UActiveItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UActiveItemComponent, ActiveSlotIndex);
+	DOREPLIFETIME(UActiveItemComponent, ActiveHotbarSlotIndex);
 }

@@ -37,7 +37,7 @@ void UWeaponManagerComponent::BeginPlay()
 	ActiveItemComponent = GetOwner() ? GetOwner()->FindComponentByClass<UActiveItemComponent>() : nullptr;
 	if (ActiveItemComponent)
 	{
-		ActiveItemComponent->OnActiveEquipmentSlotChanged.AddUniqueDynamic(this, &UWeaponManagerComponent::OnActiveSlotChanged);
+		ActiveItemComponent->OnActiveHotbarSlotChanged.AddUniqueDynamic(this, &UWeaponManagerComponent::OnActiveSlotChanged);
 	}
 
 	if (!InventoryManager)
@@ -45,8 +45,8 @@ void UWeaponManagerComponent::BeginPlay()
 		return;
 	}
 
-	EquipmentContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Equipment);
-	if (EquipmentContainerIndex == INDEX_NONE)
+	HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
+	if (HotbarContainerIndex == INDEX_NONE)
 	{
 		return;
 	}
@@ -54,21 +54,21 @@ void UWeaponManagerComponent::BeginPlay()
 	InventoryManager->OnInventorySlotChanged.AddDynamic(this, &UWeaponManagerComponent::OnInventorySlotChanged);
 
 	// Initial state
-	const int32 NumSlots = InventoryManager->GetNumSlots(EquipmentContainerIndex);
-	CurrentEquipment.SetNum(NumSlots);
+	const int32 NumSlots = InventoryManager->GetNumSlots(HotbarContainerIndex);
+	CurrentHotbar.SetNum(NumSlots);
 	for (int32 i = 0; i < NumSlots; ++i)
 	{
-		RefreshEquipmentSlot(i);
+		RefreshHotbarSlot(i);
 	}
 }
 
 void UWeaponManagerComponent::OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex)
 {
-	if (ContainerIndex != EquipmentContainerIndex)
+	if (ContainerIndex != HotbarContainerIndex)
 	{
 		return;
 	}
-	RefreshEquipmentSlot(SlotIndex);
+	RefreshHotbarSlot(SlotIndex);
 }
 
 void UWeaponManagerComponent::OnActiveSlotChanged(int32 NewActiveSlotIndex, int32 OldActiveSlotIndex)
@@ -84,15 +84,15 @@ void UWeaponManagerComponent::OnActiveSlotChanged(int32 NewActiveSlotIndex, int3
 	}
 }
 
-void UWeaponManagerComponent::RefreshEquipmentSlot(int32 SlotIndex)
+void UWeaponManagerComponent::RefreshHotbarSlot(int32 SlotIndex)
 {
-	if (!InventoryManager || EquipmentContainerIndex == INDEX_NONE)
+	if (!InventoryManager || HotbarContainerIndex == INDEX_NONE)
 	{
 		return;
 	}
 
-	UInventoryItemInstance* NewItem = InventoryManager->GetItemInstanceInSlot(SlotIndex, EquipmentContainerIndex);
-	UInventoryItemInstance* OldItem = CurrentEquipment.IsValidIndex(SlotIndex) ? CurrentEquipment[SlotIndex] : nullptr;
+	UInventoryItemInstance* NewItem = InventoryManager->GetItemInstanceInSlot(SlotIndex, HotbarContainerIndex);
+	UInventoryItemInstance* OldItem = CurrentHotbar.IsValidIndex(SlotIndex) ? CurrentHotbar[SlotIndex] : nullptr;
 
 	if (NewItem == OldItem)
 	{
@@ -107,14 +107,14 @@ void UWeaponManagerComponent::RefreshEquipmentSlot(int32 SlotIndex)
 		DestroyWeaponActorForSlot(SlotIndex);
 	}
 
-	if (CurrentEquipment.IsValidIndex(SlotIndex))
+	if (CurrentHotbar.IsValidIndex(SlotIndex))
 	{
-		CurrentEquipment[SlotIndex] = NewItem;
+		CurrentHotbar[SlotIndex] = NewItem;
 	}
 	else
 	{
-		CurrentEquipment.SetNum(SlotIndex + 1);
-		CurrentEquipment[SlotIndex] = NewItem;
+		CurrentHotbar.SetNum(SlotIndex + 1);
+		CurrentHotbar[SlotIndex] = NewItem;
 	}
 
 	// Equipped
@@ -191,7 +191,7 @@ void UWeaponManagerComponent::DestroyWeaponActorForSlot(int32 SlotIndex)
 
 void UWeaponManagerComponent::UpdateAttachmentForSlot(int32 SlotIndex)
 {
-	UInventoryItemInstance* Item = CurrentEquipment.IsValidIndex(SlotIndex) ? CurrentEquipment[SlotIndex] : nullptr;
+	UInventoryItemInstance* Item = CurrentHotbar.IsValidIndex(SlotIndex) ? CurrentHotbar[SlotIndex] : nullptr;
 	if (!Item)
 	{
 		return;
