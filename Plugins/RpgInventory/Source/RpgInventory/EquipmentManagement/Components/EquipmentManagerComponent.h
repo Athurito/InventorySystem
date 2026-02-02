@@ -36,14 +36,16 @@ class RPGINVENTORY_API UEquipmentManagerComponent : public UActorComponent
 public:
 	UEquipmentManagerComponent();
 
+	/**
+	 * Initializes this manager with the authoritative inventory manager (PlayerState) and the active-item component (Character).
+	 * Called by `URpgInventoryWiringComponent` once PlayerState/Inventory are ready on server & clients.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Equipment")
+	void InitializeFromInventory(UInventoryManagerComponent* InInventoryManager, UActiveItemComponent* InActiveItemComponent);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-	/** Resolves InventoryManager/Equipment container and binds events once PlayerState is ready (clients). */
-	void TryInitialize();
-	void ScheduleInitRetry();
-	void ClearInitRetry();
 
 	UFUNCTION()
 	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
@@ -69,7 +71,6 @@ private:
 	int32 EquipmentContainerIndex = INDEX_NONE;
 
 	bool bInitialized = false;
-	FTimerHandle InitRetryHandle;
 
 	// Speichert die aktuell ausgerüsteten Instanzen für den Vergleich
 	UPROPERTY(Transient)

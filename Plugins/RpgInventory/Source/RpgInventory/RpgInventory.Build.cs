@@ -29,6 +29,7 @@ public class RpgInventory : ModuleRules
 				"UMG",
 				"CommonUI",
 				"GameplayTags",
+				"ModularGameplay",
 				"GameplayAbilities",
 				"GameplayTasks",
 				"NetCore",

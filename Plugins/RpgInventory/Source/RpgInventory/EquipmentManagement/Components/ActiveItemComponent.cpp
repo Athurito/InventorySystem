@@ -17,27 +17,34 @@ UActiveItemComponent::UActiveItemComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-void UActiveItemComponent::BeginPlay()
+void UActiveItemComponent::InitializeFromInventory(UInventoryManagerComponent* InInventoryManager)
 {
-	Super::BeginPlay();
-
-	if (APawn* OwningPawn = Cast<APawn>(GetOwner()))
-	{
-		if (APlayerState* PS = OwningPawn->GetPlayerState())
-		{
-			InventoryManager = PS->FindComponentByClass<UInventoryManagerComponent>();
-		}
-	}
-	
-	if (!InventoryManager)
-	{
-		InventoryManager = GetOwner()->FindComponentByClass<UInventoryManagerComponent>();
-	}
+	InventoryManager = InInventoryManager;
+	HotbarContainerIndex = INDEX_NONE;
 
 	if (InventoryManager)
 	{
 		HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
 	}
+
+	// If we already have an active slot (e.g. replicated), ensure grants are in sync.
+	if (ActiveHotbarSlotIndex != INDEX_NONE)
+	{
+		RemoveActiveGrants();
+		if (InventoryManager && HotbarContainerIndex != INDEX_NONE)
+		{
+			if (UInventoryItemInstance* Item = InventoryManager->GetItemInstanceInSlot(ActiveHotbarSlotIndex, HotbarContainerIndex))
+			{
+				ApplyActiveGrants(Item);
+			}
+		}
+	}
+}
+
+void UActiveItemComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	// Wiring happens via `URpgInventoryWiringComponent`.
 }
 
 void UActiveItemComponent::SetActiveSlot(int32 HotbarSlotIndex)
@@ -45,6 +52,22 @@ void UActiveItemComponent::SetActiveSlot(int32 HotbarSlotIndex)
 	if (GetOwnerRole() < ROLE_Authority)
 	{
 		return;
+	}
+
+	// Safety: if not wired yet, try a one-shot resolve (no timers).
+	if (!InventoryManager)
+	{
+		if (const APawn* Pawn = Cast<APawn>(GetOwner()))
+		{
+			if (APlayerState* PS = Pawn->GetPlayerState())
+			{
+				InventoryManager = PS->FindComponentByClass<UInventoryManagerComponent>();
+			}
+		}
+		if (InventoryManager && HotbarContainerIndex == INDEX_NONE)
+		{
+			HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
+		}
 	}
 
 	const int32 OldIndex = ActiveHotbarSlotIndex;

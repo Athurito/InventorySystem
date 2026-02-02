@@ -7,7 +7,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
-#include "TimerManager.h"
 #include "RpgInventory/InventoryManagement/Components/InventoryManagerComponent.h"
 #include "RpgInventory/InventoryManagement/Items/InventoryItemInstance.h"
 #include "RpgInventory/InventoryManagement/Items/Fragments/InventoryFragment_WeaponConfig.h"
@@ -21,20 +20,11 @@ UWeaponManagerComponent::UWeaponManagerComponent()
 void UWeaponManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	ActiveItemComponent = GetOwner() ? GetOwner()->FindComponentByClass<UActiveItemComponent>() : nullptr;
-	if (ActiveItemComponent)
-	{
-		ActiveItemComponent->OnActiveHotbarSlotChanged.AddUniqueDynamic(this, &UWeaponManagerComponent::OnActiveSlotChanged);
-	}
-
-	TryInitialize();
+	// Wiring happens via `URpgInventoryWiringComponent`.
 }
 
 void UWeaponManagerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	ClearInitRetry();
-
 	if (InventoryManager)
 	{
 		InventoryManager->OnInventorySlotChanged.RemoveDynamic(this, &UWeaponManagerComponent::OnInventorySlotChanged);
@@ -44,53 +34,50 @@ void UWeaponManagerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		ActiveItemComponent->OnActiveHotbarSlotChanged.RemoveDynamic(this, &UWeaponManagerComponent::OnActiveSlotChanged);
 	}
 
+	// Cleanup spawned actors on server
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		for (TPair<int32, FSpawnedWeaponSlot>& Pair : SpawnedWeapons)
+		{
+			if (Pair.Value.SpawnedActor)
+			{
+				Pair.Value.SpawnedActor->Destroy();
+			}
+		}
+		SpawnedWeapons.Reset();
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
-void UWeaponManagerComponent::TryInitialize()
+void UWeaponManagerComponent::InitializeFromInventory(UInventoryManagerComponent* InInventoryManager, UActiveItemComponent* InActiveItemComponent)
 {
 	if (bInitialized)
 	{
 		return;
 	}
 
-	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor)
+	InventoryManager = InInventoryManager;
+	ActiveItemComponent = InActiveItemComponent;
+
+	if (ActiveItemComponent)
 	{
-		ScheduleInitRetry();
-		return;
+		ActiveItemComponent->OnActiveHotbarSlotChanged.AddUniqueDynamic(this, &UWeaponManagerComponent::OnActiveSlotChanged);
 	}
 
-	// Inventory lives on PlayerState; on clients PlayerState can be null during BeginPlay.
-	InventoryManager = nullptr;
-	if (APawn* OwningPawn = Cast<APawn>(OwnerActor))
-	{
-		if (APlayerState* PS = OwningPawn->GetPlayerState())
-		{
-			InventoryManager = PS->FindComponentByClass<UInventoryManagerComponent>();
-		}
-	}
 	if (!InventoryManager)
 	{
-		InventoryManager = OwnerActor->FindComponentByClass<UInventoryManagerComponent>();
-	}
-	if (!InventoryManager)
-	{
-		ScheduleInitRetry();
 		return;
 	}
 
 	HotbarContainerIndex = InventoryManager->GetFirstContainerIndexByType(EInventorySlotType::Hotbar);
 	if (HotbarContainerIndex == INDEX_NONE)
 	{
-		ScheduleInitRetry();
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("[WeaponMgrInit] Owner=%s HotbarContainerIndex=%d"), *GetNameSafe(GetOwner()), HotbarContainerIndex);
 
 	InventoryManager->OnInventorySlotChanged.AddUniqueDynamic(this, &UWeaponManagerComponent::OnInventorySlotChanged);
 
-	// Initial state
 	const int32 NumSlots = InventoryManager->GetNumSlots(HotbarContainerIndex);
 	CurrentHotbar.SetNum(NumSlots);
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -99,40 +86,11 @@ void UWeaponManagerComponent::TryInitialize()
 	}
 
 	bInitialized = true;
-	ClearInitRetry();
-}
-
-void UWeaponManagerComponent::ScheduleInitRetry()
-{
-	if (bInitialized)
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	if (World->GetTimerManager().IsTimerActive(InitRetryHandle))
-	{
-		return;
-	}
-
-	World->GetTimerManager().SetTimer(
-		InitRetryHandle,
-		FTimerDelegate::CreateUObject(this, &UWeaponManagerComponent::TryInitialize),
-		0.1f,
-		true);
-}
-
-void UWeaponManagerComponent::ClearInitRetry()
-{
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(InitRetryHandle);
-	}
+	UE_LOG(LogTemp, Warning, TEXT("[WeaponMgrInit] Owner=%s PS=%s InvOwner=%s HotbarContainerIndex=%d"),
+		*GetNameSafe(GetOwner()),
+		*GetNameSafe(Cast<APawn>(GetOwner()) ? Cast<APawn>(GetOwner())->GetPlayerState() : nullptr),
+		*GetNameSafe(InventoryManager ? InventoryManager->GetOwner() : nullptr),
+		HotbarContainerIndex);
 }
 
 void UWeaponManagerComponent::OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex)

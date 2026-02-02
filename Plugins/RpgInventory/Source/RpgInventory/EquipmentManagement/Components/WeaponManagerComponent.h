@@ -33,13 +33,16 @@ class RPGINVENTORY_API UWeaponManagerComponent : public UActorComponent
 public:
 	UWeaponManagerComponent();
 
+	/**
+	 * Initializes the manager with the authoritative inventory manager (PlayerState) and active-item component (Character).
+	 * Called by `URpgInventoryWiringComponent` once PlayerState/Inventory are ready on server & clients.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void InitializeFromInventory(UInventoryManagerComponent* InInventoryManager, UActiveItemComponent* InActiveItemComponent);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-	void TryInitialize();
-	void ScheduleInitRetry();
-	void ClearInitRetry();
 
 	UFUNCTION()
 	void OnInventorySlotChanged(int32 ContainerIndex, int32 SlotIndex);
@@ -65,7 +68,6 @@ private:
 	int32 HotbarContainerIndex = INDEX_NONE;
 
 	bool bInitialized = false;
-	FTimerHandle InitRetryHandle;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInventoryItemInstance>> CurrentHotbar;

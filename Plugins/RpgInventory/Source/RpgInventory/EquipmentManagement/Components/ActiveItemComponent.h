@@ -20,6 +20,13 @@ class RPGINVENTORY_API UActiveItemComponent : public UActorComponent
 public:
 	UActiveItemComponent();
 
+	/**
+	 * Initializes this component with the authoritative inventory manager (typically on PlayerState).
+	 * Called by `URpgInventoryWiringComponent` once PlayerState/Inventory are ready on server & clients.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ActiveItem")
+	void InitializeFromInventory(UInventoryManagerComponent* InInventoryManager);
+
 	/** Fired on server when active slot changes and on clients via OnRep. */
 	UPROPERTY(BlueprintAssignable, Category="ActiveItem")
 	FOnActiveHotbarSlotChanged OnActiveHotbarSlotChanged;
