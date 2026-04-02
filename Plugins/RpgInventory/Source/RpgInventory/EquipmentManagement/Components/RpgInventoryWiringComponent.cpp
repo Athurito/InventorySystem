@@ -2,6 +2,7 @@
 
 #include "RpgInventoryWiringComponent.h"
 
+#include "IMotionController.h"
 #include "UObject/UObjectGlobals.h"
 
 #include "GameFramework/Pawn.h"
@@ -32,60 +33,47 @@ URpgInventoryWiringComponent::URpgInventoryWiringComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void URpgInventoryWiringComponent::BeginPlay()
+bool URpgInventoryWiringComponent::CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const
 {
-	Super::BeginPlay();
-
-	RegisterInitStateFeature();
-
-	// No timers: re-check init when the Pawn's PlayerState is replicated/assigned.
-	if (!OwnerPropertyChangedHandle.IsValid())
+	check(Manager);
+	APawn* Pawn = GetPawn<APawn>();
+	
+	if (!Pawn) return false;
+	
+	//---------- Spawned ------------
+	if (!CurrentState.IsValid() && DesiredState == RpgTags::InitState_Spawned)
 	{
-		OwnerPropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddUObject(
-			this, &URpgInventoryWiringComponent::HandleOwnerPropertyChanged);
+		return true;
 	}
-
-	TryToChangeInitState(RpgTags::InitState_Spawned);
-	CheckDefaultInitialization();
+	
+	//---------- DataAvailable ------------
+	if (CurrentState == RpgTags::InitState_Spawned && DesiredState == RpgTags::InitState_DataAvailable)
+	{
+		return true;
+	}
+	//---------- DataInitialized ------------
+	if (CurrentState == RpgTags::InitState_DataAvailable && DesiredState == RpgTags::InitState_DataInitialized)
+	{
+		Manager->HasFeatureReachedInitState(Pawn, RpgInventoryWiring::FeatureName, RpgTags::InitState_DataInitialized);
+	}
+	//---------- GameplayReady ------------
+	if (CurrentState == RpgTags::InitState_DataInitialized && DesiredState == RpgTags::InitState_GameplayReady)
+	{
+		return true;
+	}
+	
+	
 }
 
-void URpgInventoryWiringComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void URpgInventoryWiringComponent::HandleChangeInitState(UGameFrameworkComponentManager* Manager,
+	FGameplayTag CurrentState, FGameplayTag DesiredState)
 {
-	if (OwnerPropertyChangedHandle.IsValid())
-	{
-		FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(OwnerPropertyChangedHandle);
-		OwnerPropertyChangedHandle.Reset();
-	}
-
-	UnregisterInitStateFeature();
-	Super::EndPlay(EndPlayReason);
+	IGameFrameworkInitStateInterface::HandleChangeInitState(Manager, CurrentState, DesiredState);
 }
 
-void URpgInventoryWiringComponent::HandleOwnerPropertyChanged(UObject* Object, FPropertyChangedEvent& PropertyChangedEvent)
+void URpgInventoryWiringComponent::OnActorInitStateChanged(const FActorInitStateChangedParams& Params)
 {
-	// We only care about our owning Pawn and its PlayerState being set/replicated.
-	if (!Object || Object != GetOwner())
-	{
-		return;
-	}
-
-	const FProperty* ChangedProperty = PropertyChangedEvent.Property;
-	if (!ChangedProperty)
-	{
-		return;
-	}
-
-	// Pawn has a property named "PlayerState" (replicatedUsing=OnRep_PlayerState). It's private, so use name.
-	static const FName PlayerStatePropertyName(TEXT("PlayerState"));
-	if (ChangedProperty->GetFName() == PlayerStatePropertyName)
-	{
-		CheckDefaultInitialization();
-	}
-}
-
-FName URpgInventoryWiringComponent::GetFeatureName() const
-{
-	return RpgInventoryWiring::FeatureName;
+	IGameFrameworkInitStateInterface::OnActorInitStateChanged(Params);
 }
 
 void URpgInventoryWiringComponent::CheckDefaultInitialization()
@@ -93,109 +81,24 @@ void URpgInventoryWiringComponent::CheckDefaultInitialization()
 	ContinueInitStateChain(RpgInventoryWiring::InitStateChain);
 }
 
-bool URpgInventoryWiringComponent::CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState,
-	FGameplayTag DesiredState) const
+void URpgInventoryWiringComponent::BeginPlay()
 {
-	if (!DesiredState.IsValid())
-	{
-		return false;
-	}
-
-	if (DesiredState == RpgTags::InitState_Spawned)
-	{
-		return true;
-	}
-
-	// We need a valid PlayerState + InventoryManager for anything beyond Spawned.
-	if (DesiredState == RpgTags::InitState_DataAvailable)
-	{
-		return ResolveInventoryManager() != nullptr;
-	}
-
-	if (DesiredState == RpgTags::InitState_DataInitialized)
-	{
-		UInventoryManagerComponent* IM = ResolveInventoryManager();
-		if (!IM)
-		{
-			return false;
-		}
-
-		// Container definitions must be present so the character systems can initialize immediately.
-		return IM->GetFirstContainerIndexByType(EInventorySlotType::Hotbar) != INDEX_NONE;
-	}
-
-	if (DesiredState == RpgTags::InitState_GameplayReady)
-	{
-		return bCharacterSystemsInitialized;
-	}
-
-	return false;
+	Super::BeginPlay();
 }
 
-void URpgInventoryWiringComponent::HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState,
-	FGameplayTag DesiredState)
+void URpgInventoryWiringComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (DesiredState == RpgTags::InitState_DataInitialized)
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void URpgInventoryWiringComponent::OnRegister()
+{
+	Super::OnRegister();
+	if (GetPawn<APawn>())
 	{
-		UInventoryManagerComponent* IM = ResolveInventoryManager();
-		if (IM)
-		{
-			InitializeCharacterSystems(IM);
-		}
+		RegisterInitStateFeature();
 	}
 }
 
-UInventoryManagerComponent* URpgInventoryWiringComponent::ResolveInventoryManager() const
-{
-	APawn* OwningPawn = Cast<APawn>(GetOwner());
-	if (!OwningPawn)
-	{
-		return nullptr;
-	}
 
-	APlayerState* PS = OwningPawn->GetPlayerState();
-	if (!PS)
-	{
-		return nullptr;
-	}
-
-	return PS->FindComponentByClass<UInventoryManagerComponent>();
-}
-
-void URpgInventoryWiringComponent::InitializeCharacterSystems(UInventoryManagerComponent* InventoryManager)
-{
-	if (bCharacterSystemsInitialized)
-	{
-		return;
-	}
-	if (!InventoryManager)
-	{
-		return;
-	}
-	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor)
-	{
-		return;
-	}
-
-	UActiveItemComponent* ActiveItem = OwnerActor->FindComponentByClass<UActiveItemComponent>();
-	if (ActiveItem)
-	{
-		ActiveItem->InitializeFromInventory(InventoryManager);
-	}
-
-	if (UEquipmentManagerComponent* EquipMgr = OwnerActor->FindComponentByClass<UEquipmentManagerComponent>())
-	{
-		EquipMgr->InitializeFromInventory(InventoryManager, ActiveItem);
-	}
-
-	if (UWeaponManagerComponent* WeaponMgr = OwnerActor->FindComponentByClass<UWeaponManagerComponent>())
-	{
-		WeaponMgr->InitializeFromInventory(InventoryManager, ActiveItem);
-	}
-
-	bCharacterSystemsInitialized = true;
-
-	// Once we initialize, try to progress to GameplayReady.
-	TryToChangeInitState(RpgTags::InitState_GameplayReady);
-}

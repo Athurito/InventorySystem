@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Components/GameFrameworkInitStateInterface.h"
+#include "Components/PawnComponent.h"
 
 #include "RpgInventoryWiringComponent.generated.h"
 
@@ -24,22 +25,25 @@ struct FPropertyChangedEvent;
  * Add this component to your Character/Pawn (plugin-friendly: no base class required).
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class RPGINVENTORY_API URpgInventoryWiringComponent : public UActorComponent, public IGameFrameworkInitStateInterface
+class RPGINVENTORY_API URpgInventoryWiringComponent : public UPawnComponent, public IGameFrameworkInitStateInterface
 {
 	GENERATED_BODY()
 
 public:
 	URpgInventoryWiringComponent();
 
+	static const FName Name_ActorFeatureName;
 	//~IGameFrameworkInitStateInterface
-	virtual FName GetFeatureName() const override;
-	virtual void CheckDefaultInitialization() override;
+	virtual FName GetFeatureName() const override {return Name_ActorFeatureName;}
 	virtual bool CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const override;
 	virtual void HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) override;
+	virtual void OnActorInitStateChanged(const FActorInitStateChangedParams& Params) override;
+	virtual void CheckDefaultInitialization() override;
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnRegister() override;
 
 private:
 	UInventoryManagerComponent* ResolveInventoryManager() const;
